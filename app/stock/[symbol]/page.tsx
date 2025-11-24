@@ -124,6 +124,7 @@ export default function StockDetailsPage() {
       clearTimeout(stockTimeout);
       clearTimeout(historyTimeout);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symbol]);
 
   if (loading && !stock) {

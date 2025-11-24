@@ -42,6 +42,7 @@ export default function Sidebar({ isOpen: controlledIsOpen, onClose }: SidebarPr
     if (isOpen) {
       setIsOpen(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   // Prevent body scroll when mobile menu is open

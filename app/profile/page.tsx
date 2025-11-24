@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import Image from "next/image";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
 import { User } from "@/lib/types";
@@ -58,10 +59,12 @@ export default function ProfilePage() {
             >
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6">
                 <div className="relative flex-shrink-0">
-                  <img
+                  <Image
                     src={user.avatar}
                     alt={user.name}
-                    className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-blue-primary shadow-blue-glow"
+                    width={128}
+                    height={128}
+                    className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-blue-primary shadow-blue-glow object-cover"
                   />
                   <div className="absolute bottom-0 right-0 p-1.5 sm:p-2 bg-blue-gradient rounded-full border-4 border-dark-card">
                     <UserIcon className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
