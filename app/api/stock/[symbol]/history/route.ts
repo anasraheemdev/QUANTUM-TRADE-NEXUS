@@ -80,10 +80,26 @@ export async function GET(
 
     const symbolUpper = symbol.toUpperCase();
 
-    // Fetch both candle data and profile in parallel
+    // Fetch both candle data and profile in parallel with timeout
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('API request timeout')), 10000); // 10 second timeout
+    });
+
     const [data, profile] = await Promise.all([
-      stockCandlesPromise(finnhubClient, symbolUpper, resolution, from, to).catch(() => null),
-      companyProfilePromise(finnhubClient, symbolUpper).catch(() => null),
+      Promise.race([
+        stockCandlesPromise(finnhubClient, symbolUpper, resolution, from, to),
+        timeoutPromise,
+      ]).catch((err) => {
+        console.error(`Candles API error for ${symbolUpper}:`, err);
+        return null;
+      }),
+      Promise.race([
+        companyProfilePromise(finnhubClient, symbolUpper),
+        timeoutPromise,
+      ]).catch((err) => {
+        console.error(`Profile API error for ${symbolUpper}:`, err);
+        return null;
+      }),
     ]);
 
     // Check if API returned an error

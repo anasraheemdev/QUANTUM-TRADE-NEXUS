@@ -59,10 +59,26 @@ export async function GET(
 
     const symbolUpper = symbol.toUpperCase();
 
-    // Fetch both quote and profile in parallel
+    // Fetch both quote and profile in parallel with timeout
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('API request timeout')), 8000); // 8 second timeout
+    });
+
     const [quote, profile] = await Promise.all([
-      quotePromise(finnhubClient, symbolUpper).catch(() => null),
-      companyProfilePromise(finnhubClient, symbolUpper).catch(() => null),
+      Promise.race([
+        quotePromise(finnhubClient, symbolUpper),
+        timeoutPromise,
+      ]).catch((err) => {
+        console.error(`Quote API error for ${symbolUpper}:`, err);
+        return null;
+      }),
+      Promise.race([
+        companyProfilePromise(finnhubClient, symbolUpper),
+        timeoutPromise,
+      ]).catch((err) => {
+        console.error(`Profile API error for ${symbolUpper}:`, err);
+        return null;
+      }),
     ]);
 
     // Check if API returned an error

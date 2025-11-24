@@ -22,34 +22,141 @@ export default function StockDetailsPage() {
   const [history, setHistory] = useState<StockHistory | null>(null);
   const [isBuyModalOpen, setIsBuyModalOpen] = useState(false);
   const [isSellModalOpen, setIsSellModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Fetch stock data
+    let isMounted = true;
+    setLoading(true);
+    setError(null);
+
+    // Fetch stock data with timeout
+    const stockTimeout = setTimeout(() => {
+      if (isMounted && !stock) {
+        setError("Stock data is taking longer than expected. Please try again.");
+        setLoading(false);
+      }
+    }, 10000); // 10 second timeout
+
     fetch(`/api/stock/${symbol}`)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
       .then((data) => {
+        clearTimeout(stockTimeout);
+        if (!isMounted) return;
+        
         if (data.error) {
           console.error("API Error:", data.error);
+          setError(data.error);
+          setLoading(false);
           return;
         }
         setStock(data);
+        if (!history) {
+          setLoading(false);
+        }
       })
-      .catch((err) => console.error("Failed to fetch stock:", err));
+      .catch((err) => {
+        clearTimeout(stockTimeout);
+        if (!isMounted) return;
+        console.error("Failed to fetch stock:", err);
+        setError("Failed to load stock data. Please try again.");
+        setLoading(false);
+      });
 
-    // Fetch stock history
+    // Fetch stock history with timeout (optional - don't block page render)
+    const historyTimeout = setTimeout(() => {
+      if (isMounted && !history) {
+        console.warn("History data timeout - continuing without history");
+      }
+    }, 15000); // 15 second timeout
+
     fetch(`/api/stock/${symbol}/history?interval=1day&outputsize=30`)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
       .then((data) => {
+        clearTimeout(historyTimeout);
+        if (!isMounted) return;
+        
         if (data.error) {
           console.error("API Error:", data.error);
+          // Don't set error for history - it's optional
+          // Create empty history data structure
+          setHistory({
+            symbol: symbol.toUpperCase(),
+            name: stock?.name || symbol.toUpperCase(),
+            lineData: [],
+            candleData: [],
+          });
           return;
         }
         setHistory(data);
+        if (stock) {
+          setLoading(false);
+        }
       })
-      .catch((err) => console.error("Failed to fetch history:", err));
+      .catch((err) => {
+        clearTimeout(historyTimeout);
+        if (!isMounted) return;
+        console.error("Failed to fetch history:", err);
+        // Don't block page render if history fails - create empty structure
+        setHistory({
+          symbol: symbol.toUpperCase(),
+          name: stock?.name || symbol.toUpperCase(),
+          lineData: [],
+          candleData: [],
+        });
+        if (stock) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+      clearTimeout(stockTimeout);
+      clearTimeout(historyTimeout);
+    };
   }, [symbol]);
 
-  if (!stock || !history) {
+  if (loading && !stock) {
+    return <Loading />;
+  }
+
+  if (error && !stock) {
+    return (
+      <div className="min-h-screen bg-dark-bg">
+        <Navbar />
+        <div className="flex">
+          <Sidebar />
+          <main className="flex-1 p-6 lg:p-8">
+            <div className="max-w-7xl mx-auto">
+              <div className="rounded-lg border border-red-500 bg-dark-card p-6">
+                <h2 className="text-2xl font-bold text-red-400 mb-4">Error Loading Stock</h2>
+                <p className="text-blue-accent/70 mb-4">{error}</p>
+                <Link
+                  href="/"
+                  className="inline-flex items-center gap-2 text-blue-accent hover:text-blue-primary transition-colors"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  <span>Back to Markets</span>
+                </Link>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  if (!stock) {
     return <Loading />;
   }
 
@@ -148,14 +255,29 @@ export default function StockDetailsPage() {
             </motion.div>
 
             {/* Charts */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="mb-8"
-            >
-              <StockChart history={history} />
-            </motion.div>
+            {history && history.lineData && history.lineData.length > 0 ? (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="mb-8"
+              >
+                <StockChart history={history} />
+              </motion.div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="mb-8"
+              >
+                <div className="rounded-lg border border-dark-border bg-dark-card p-6">
+                  <p className="text-blue-accent/70">
+                    Chart data is currently unavailable. Please try refreshing the page.
+                  </p>
+                </div>
+              </motion.div>
+            )}
 
             {/* Additional Info */}
             <motion.div
