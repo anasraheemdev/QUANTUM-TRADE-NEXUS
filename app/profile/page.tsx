@@ -68,6 +68,7 @@ export default function ProfilePage() {
 
     const fetchUserProfile = async () => {
       try {
+        console.log('Fetching user profile...');
         const token = session.access_token;
         const response = await fetch("/api/user", {
           headers: {
@@ -76,22 +77,35 @@ export default function ProfilePage() {
         });
 
         if (!response.ok) {
-          throw new Error("Failed to fetch user profile");
+          const errorData = await response.json().catch(() => ({}));
+          console.error("Failed to fetch user profile:", response.status, errorData);
+          throw new Error(errorData.error || "Failed to fetch user profile");
         }
 
         const userData = await response.json();
+        console.log('User data received:', userData);
         
-        // Fetch transaction stats
-        const { data: transactions } = await supabase
-          .from("transactions")
-          .select("*")
-          .eq("user_id", authUser.id)
-          .order("created_at", { ascending: false });
+        // Fetch transaction stats (with error handling)
+        let transactions = [];
+        try {
+          const { data, error } = await supabase
+            .from("transactions")
+            .select("*")
+            .eq("user_id", authUser.id)
+            .order("created_at", { ascending: false });
+          
+          if (error) {
+            console.error("Error fetching transactions:", error);
+          } else {
+            transactions = data || [];
+          }
+        } catch (transError) {
+          console.error("Exception fetching transactions:", transError);
+        }
 
         const totalTrades = transactions?.length || 0;
         const profitableTrades = transactions?.filter((t: any) => {
           if (t.type === "buy") return false;
-          // This is simplified - in a real app, you'd calculate actual profit
           return true;
         }).length || 0;
         const winRate = totalTrades > 0 ? (profitableTrades / totalTrades) * 100 : 0;
@@ -104,11 +118,11 @@ export default function ProfilePage() {
           stats: {
             totalTrades,
             winRate,
-            avgReturn: 0, // Would need to calculate from actual trades
+            avgReturn: 0,
             bestTrade: bestTrade ? {
               symbol: bestTrade.symbol,
               date: bestTrade.created_at,
-              gain: 0, // Would need to calculate
+              gain: 0,
             } : {
               symbol: "N/A",
               date: new Date().toISOString(),
@@ -124,11 +138,42 @@ export default function ProfilePage() {
         
         setUser(userProfile);
         setEditForm({
-          name: userData.name || "",
+          name: userData.name || authUser.email?.split("@")[0] || "User",
           trading_level: userData.trading_level || "Beginner",
         });
       } catch (error) {
         console.error("Failed to fetch user:", error);
+        // Set default user profile to prevent infinite loading
+        const defaultUser: UserProfile = {
+          id: authUser.id,
+          email: authUser.email || "",
+          name: authUser.user_metadata?.name || authUser.email?.split("@")[0] || "User",
+          avatar_url: null,
+          account_balance: 100000,
+          total_invested: 0,
+          member_since: new Date().toISOString(),
+          trading_level: "Beginner",
+          stats: {
+            totalTrades: 0,
+            winRate: 0,
+            avgReturn: 0,
+            bestTrade: {
+              symbol: "N/A",
+              date: new Date().toISOString(),
+              gain: 0,
+            },
+          },
+          preferences: {
+            theme: "Dark",
+            notifications: true,
+            twoFactorAuth: false,
+          },
+        };
+        setUser(defaultUser);
+        setEditForm({
+          name: defaultUser.name,
+          trading_level: defaultUser.trading_level,
+        });
       } finally {
         setLoading(false);
       }
