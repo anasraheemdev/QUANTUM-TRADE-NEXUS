@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Stock } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface BuySellModalProps {
   isOpen: boolean;
@@ -19,9 +20,12 @@ export default function BuySellModal({
   stock,
   type,
 }: BuySellModalProps) {
+  const { session } = useAuth();
   const [quantity, setQuantity] = useState<string>("1");
   const [orderType, setOrderType] = useState<"market" | "limit">("market");
   const [limitPrice, setLimitPrice] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!stock) return null;
 
@@ -32,11 +36,47 @@ export default function BuySellModal({
   const estimatedFee = total * 0.001; // 0.1% fee
   const totalCost = estimatedCost + estimatedFee;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Static UI only - no actual functionality
-    alert(`${type === "buy" ? "Buy" : "Sell"} order submitted (UI only - no backend)`);
-    onClose();
+    
+    if (!session) {
+      setError("Please sign in to place orders");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const token = session.access_token;
+      const response = await fetch("/api/transactions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          symbol: stock.symbol,
+          type: type,
+          shares: qty,
+          price: price,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to process transaction");
+      }
+
+      // Success - close modal and refresh page
+      onClose();
+      window.location.reload(); // Refresh to update portfolio
+    } catch (err: any) {
+      setError(err.message || "Failed to process transaction");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -77,6 +117,13 @@ export default function BuySellModal({
 
               {/* Content */}
               <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                {/* Error Message */}
+                {error && (
+                  <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                    {error}
+                  </div>
+                )}
+
                 {/* Stock Info */}
                 <div className="rounded-lg bg-dark-hover p-4 border border-dark-border">
                   <div className="flex items-center justify-between">
@@ -193,13 +240,21 @@ export default function BuySellModal({
                 {/* Submit Button */}
                 <button
                   type="submit"
-                  className={`w-full py-3 rounded-lg font-bold text-white transition-all shadow-lg ${
+                  disabled={isSubmitting}
+                  className={`w-full py-3 rounded-lg font-bold text-white transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
                     type === "buy"
                       ? "bg-green-500 hover:bg-green-600 shadow-green-500/50"
                       : "bg-red-500 hover:bg-red-600 shadow-red-500/50"
                   }`}
                 >
-                  {type === "buy" ? "Buy" : "Sell"} {stock.symbol}
+                  {isSubmitting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      Processing...
+                    </span>
+                  ) : (
+                    `${type === "buy" ? "Buy" : "Sell"} ${stock.symbol}`
+                  )}
                 </button>
               </form>
             </div>

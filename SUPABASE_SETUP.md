@@ -114,8 +114,9 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhY
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Users table
+-- IMPORTANT: id must reference auth.users(id) for proper integration
 CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT UNIQUE NOT NULL,
   name TEXT,
   avatar_url TEXT,
@@ -166,6 +167,42 @@ CREATE INDEX idx_watchlist_user_id ON watchlist(user_id);
 CREATE INDEX idx_transactions_user_id ON transactions(user_id);
 CREATE INDEX idx_transactions_symbol ON transactions(symbol);
 ```
+
+## Step 5.5: Create Database Trigger (Recommended)
+
+To automatically create user profiles when users sign up, run this SQL in your Supabase SQL Editor:
+
+```sql
+-- Function to create user profile on auth user creation
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.users (id, email, name, account_balance, total_invested, trading_level, member_since)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1), 'User'),
+    100000,
+    0,
+    'Beginner',
+    NOW()
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger that fires when a new user is created in auth.users
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
+```
+
+This trigger will automatically create a user profile whenever someone signs up, even if email confirmation is required.
+
+**Alternative:** If you prefer not to use triggers, the application will create the user profile via API when they first sign in.
 
 ## Step 6: Set Up Row Level Security (RLS)
 

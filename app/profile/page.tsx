@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
-import { User } from "@/lib/types";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 import {
   User as UserIcon,
@@ -17,17 +19,162 @@ import {
 } from "lucide-react";
 import Loading from "@/components/Loading";
 
+interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  avatar_url: string | null;
+  account_balance: number;
+  total_invested: number;
+  member_since: string;
+  trading_level: string;
+  stats?: {
+    totalTrades: number;
+    winRate: number;
+    avgReturn: number;
+    bestTrade: {
+      symbol: string;
+      date: string;
+      gain: number;
+    };
+  };
+  preferences?: {
+    theme: string;
+    notifications: boolean;
+    twoFactorAuth: boolean;
+  };
+}
+
 export default function ProfilePage() {
-  const [user, setUser] = useState<User | null>(null);
+  const router = useRouter();
+  const { user: authUser, session, loading: authLoading } = useAuth();
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    trading_level: "",
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/data/user.json")
-      .then((res) => res.json())
-      .then((data) => setUser(data))
-      .catch((err) => console.error("Failed to fetch user:", err));
-  }, []);
+    if (authLoading) return;
+    
+    if (!authUser || !session) {
+      router.push("/signin");
+      return;
+    }
 
-  if (!user) {
+    const fetchUserProfile = async () => {
+      try {
+        const token = session.access_token;
+        const response = await fetch("/api/user", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch user profile");
+        }
+
+        const userData = await response.json();
+        
+        // Fetch transaction stats
+        const { data: transactions } = await supabase
+          .from("transactions")
+          .select("*")
+          .eq("user_id", authUser.id)
+          .order("created_at", { ascending: false });
+
+        const totalTrades = transactions?.length || 0;
+        const profitableTrades = transactions?.filter((t: any) => {
+          if (t.type === "buy") return false;
+          // This is simplified - in a real app, you'd calculate actual profit
+          return true;
+        }).length || 0;
+        const winRate = totalTrades > 0 ? (profitableTrades / totalTrades) * 100 : 0;
+
+        // Get best trade (simplified)
+        const bestTrade = transactions?.find((t: any) => t.type === "sell") || null;
+
+        const userProfile = {
+          ...userData,
+          stats: {
+            totalTrades,
+            winRate,
+            avgReturn: 0, // Would need to calculate from actual trades
+            bestTrade: bestTrade ? {
+              symbol: bestTrade.symbol,
+              date: bestTrade.created_at,
+              gain: 0, // Would need to calculate
+            } : {
+              symbol: "N/A",
+              date: new Date().toISOString(),
+              gain: 0,
+            },
+          },
+          preferences: {
+            theme: "Dark",
+            notifications: true,
+            twoFactorAuth: false,
+          },
+        };
+        
+        setUser(userProfile);
+        setEditForm({
+          name: userData.name || "",
+          trading_level: userData.trading_level || "Beginner",
+        });
+      } catch (error) {
+        console.error("Failed to fetch user:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, [authUser, session, authLoading, router]);
+
+  const handleSave = async () => {
+    if (!session || !user) return;
+    
+    setIsSaving(true);
+    setSaveMessage(null);
+    
+    try {
+      const token = session.access_token;
+      const response = await fetch("/api/user", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: editForm.name,
+          trading_level: editForm.trading_level,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update profile");
+      }
+
+      const updatedUser = await response.json();
+      setUser({ ...user, ...updatedUser });
+      setIsEditing(false);
+      setSaveMessage("Profile updated successfully!");
+      setTimeout(() => setSaveMessage(null), 3000);
+    } catch (error) {
+      console.error("Failed to update profile:", error);
+      setSaveMessage("Failed to update profile. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (authLoading || loading || !user) {
     return <Loading />;
   }
 
@@ -59,33 +206,107 @@ export default function ProfilePage() {
             >
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6">
                 <div className="relative flex-shrink-0">
-                  <Image
-                    src={user.avatar}
-                    alt={user.name}
-                    width={128}
-                    height={128}
-                    className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-blue-primary shadow-blue-glow object-cover"
-                  />
+                  {user.avatar_url ? (
+                    <Image
+                      src={user.avatar_url}
+                      alt={user.name}
+                      width={128}
+                      height={128}
+                      className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-blue-primary shadow-blue-glow object-cover"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-blue-primary shadow-blue-glow bg-blue-gradient flex items-center justify-center">
+                      <UserIcon className="h-12 w-12 sm:h-16 sm:w-16 text-white" />
+                    </div>
+                  )}
                   <div className="absolute bottom-0 right-0 p-1.5 sm:p-2 bg-blue-gradient rounded-full border-4 border-dark-card">
                     <UserIcon className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
                   </div>
                 </div>
                 <div className="flex-1 text-center sm:text-left w-full">
-                  <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-2">{user.name}</h2>
-                  <div className="flex flex-col sm:flex-row flex-wrap items-center sm:items-start justify-center sm:justify-start gap-2 sm:gap-4 text-xs sm:text-sm text-blue-accent/70">
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-3 w-3 sm:h-4 sm:w-4" />
-                      <span className="break-all">{user.email}</span>
+                  {isEditing ? (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-blue-accent mb-2">Name</label>
+                        <input
+                          type="text"
+                          value={editForm.name}
+                          onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                          className="w-full px-4 py-2 rounded-lg bg-dark-hover border border-dark-border text-white focus:outline-none focus:border-blue-primary"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-blue-accent mb-2">Trading Level</label>
+                        <select
+                          value={editForm.trading_level}
+                          onChange={(e) => setEditForm({ ...editForm, trading_level: e.target.value })}
+                          className="w-full px-4 py-2 rounded-lg bg-dark-hover border border-dark-border text-white focus:outline-none focus:border-blue-primary"
+                        >
+                          <option value="Beginner">Beginner</option>
+                          <option value="Intermediate">Intermediate</option>
+                          <option value="Advanced">Advanced</option>
+                          <option value="Expert">Expert</option>
+                        </select>
+                      </div>
+                      {saveMessage && (
+                        <div className={`p-3 rounded-lg text-sm ${
+                          saveMessage.includes("successfully") 
+                            ? "bg-green-500/10 text-green-400 border border-green-500/20" 
+                            : "bg-red-500/10 text-red-400 border border-red-500/20"
+                        }`}>
+                          {saveMessage}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSave}
+                          disabled={isSaving}
+                          className="px-4 py-2 rounded-lg bg-blue-gradient text-white font-medium hover:shadow-blue-glow transition-all disabled:opacity-50"
+                        >
+                          {isSaving ? "Saving..." : "Save Changes"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIsEditing(false);
+                            setEditForm({
+                              name: user.name || "",
+                              trading_level: user.trading_level || "Beginner",
+                            });
+                            setSaveMessage(null);
+                          }}
+                          className="px-4 py-2 rounded-lg border border-dark-border bg-dark-hover text-blue-accent hover:border-blue-primary transition-all"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                      <span>Member since {new Date(user.memberSince).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Award className="h-3 w-3 sm:h-4 sm:w-4" />
-                      <span>{user.tradingLevel} Trader</span>
-                    </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between mb-2">
+                        <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white">{user.name}</h2>
+                        <button
+                          onClick={() => setIsEditing(true)}
+                          className="px-3 py-1.5 rounded-lg border border-dark-border bg-dark-hover text-blue-accent hover:border-blue-primary transition-all text-sm"
+                        >
+                          Edit Profile
+                        </button>
+                      </div>
+                      <div className="flex flex-col sm:flex-row flex-wrap items-center sm:items-start justify-center sm:justify-start gap-2 sm:gap-4 text-xs sm:text-sm text-blue-accent/70">
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-3 w-3 sm:h-4 sm:w-4" />
+                          <span className="break-all">{user.email}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                          <span>Member since {new Date(user.member_since).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Award className="h-3 w-3 sm:h-4 sm:w-4" />
+                          <span>{user.trading_level} Trader</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -103,7 +324,7 @@ export default function ProfilePage() {
                   <UserIcon className="h-4 w-4 sm:h-5 sm:w-5 text-blue-primary" />
                 </div>
                 <div className="text-2xl sm:text-3xl font-bold text-white">
-                  {formatCurrency(user.accountBalance)}
+                  {formatCurrency(user.account_balance)}
                 </div>
               </motion.div>
 
@@ -118,7 +339,7 @@ export default function ProfilePage() {
                   <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-400" />
                 </div>
                 <div className="text-2xl sm:text-3xl font-bold text-white">
-                  {formatCurrency(user.totalInvested)}
+                  {formatCurrency(user.total_invested)}
                 </div>
               </motion.div>
             </div>
@@ -137,18 +358,18 @@ export default function ProfilePage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                 <div className="text-center sm:text-left">
                   <div className="text-xs sm:text-sm text-blue-accent/70 mb-2">Total Trades</div>
-                  <div className="text-xl sm:text-2xl font-bold text-white">{user.stats.totalTrades}</div>
+                  <div className="text-xl sm:text-2xl font-bold text-white">{user.stats?.totalTrades || 0}</div>
                 </div>
                 <div className="text-center sm:text-left">
                   <div className="text-xs sm:text-sm text-blue-accent/70 mb-2">Win Rate</div>
                   <div className="text-xl sm:text-2xl font-bold text-green-400">
-                    {user.stats.winRate.toFixed(1)}%
+                    {(user.stats?.winRate || 0).toFixed(1)}%
                   </div>
                 </div>
                 <div className="text-center sm:text-left">
                   <div className="text-xs sm:text-sm text-blue-accent/70 mb-2">Average Return</div>
                   <div className="text-xl sm:text-2xl font-bold text-blue-primary">
-                    {formatPercent(user.stats.avgReturn)}
+                    {formatPercent(user.stats?.avgReturn || 0)}
                   </div>
                 </div>
               </div>
@@ -156,13 +377,13 @@ export default function ProfilePage() {
                 <div className="text-xs sm:text-sm text-blue-accent/70 mb-2">Best Trade</div>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <div>
-                    <div className="text-sm sm:text-base font-semibold text-blue-accent">{user.stats.bestTrade.symbol}</div>
+                    <div className="text-sm sm:text-base font-semibold text-blue-accent">{user.stats?.bestTrade?.symbol || "N/A"}</div>
                     <div className="text-xs sm:text-sm text-blue-accent/70">
-                      {new Date(user.stats.bestTrade.date).toLocaleDateString()}
+                      {user.stats?.bestTrade?.date ? new Date(user.stats.bestTrade.date).toLocaleDateString() : "N/A"}
                     </div>
                   </div>
                   <div className="text-xl sm:text-2xl font-bold text-green-400">
-                    {formatCurrency(user.stats.bestTrade.gain)}
+                    {formatCurrency(user.stats?.bestTrade?.gain || 0)}
                   </div>
                 </div>
               </div>
@@ -186,7 +407,7 @@ export default function ProfilePage() {
                     <div className="text-xs sm:text-sm text-blue-accent/70">Current theme preference</div>
                   </div>
                   <div className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-blue-gradient text-white text-xs sm:text-sm font-medium whitespace-nowrap">
-                    {user.preferences.theme}
+                    {user.preferences?.theme || "Dark"}
                   </div>
                 </div>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg bg-dark-hover border border-dark-border">
@@ -196,12 +417,12 @@ export default function ProfilePage() {
                   </div>
                   <div
                     className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap ${
-                      user.preferences.notifications
+                      user.preferences?.notifications
                         ? "bg-green-500/20 text-green-400"
                         : "bg-red-500/20 text-red-400"
                     }`}
                   >
-                    {user.preferences.notifications ? "Enabled" : "Disabled"}
+                    {user.preferences?.notifications ? "Enabled" : "Disabled"}
                   </div>
                 </div>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg bg-dark-hover border border-dark-border">
@@ -211,12 +432,12 @@ export default function ProfilePage() {
                   </div>
                   <div
                     className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap ${
-                      user.preferences.twoFactorAuth
+                      user.preferences?.twoFactorAuth
                         ? "bg-green-500/20 text-green-400"
                         : "bg-red-500/20 text-red-400"
                     }`}
                   >
-                    {user.preferences.twoFactorAuth ? "Enabled" : "Disabled"}
+                    {user.preferences?.twoFactorAuth ? "Enabled" : "Disabled"}
                   </div>
                 </div>
               </div>

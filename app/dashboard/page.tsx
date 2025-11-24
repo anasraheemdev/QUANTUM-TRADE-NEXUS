@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
@@ -9,38 +10,136 @@ import PortfolioSummary from "@/components/PortfolioSummary";
 import Watchlist from "@/components/Watchlist";
 import MarketMovers from "@/components/MarketMovers";
 import StockCard from "@/components/StockCard";
+import { useAuth } from "@/contexts/AuthContext";
 import { Stock, Portfolio } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import Loading from "@/components/Loading";
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const { user, session, loading: authLoading } = useAuth();
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/stocks").then((res) => res.json()),
-      fetch("/api/portfolio").then((res) => res.json()),
-    ])
-      .then(([stocksData, portfolioData]) => {
+    // Wait for auth to finish loading
+    if (authLoading) {
+      return;
+    }
+    
+    // Only redirect if auth is done loading and user is still not authenticated
+    if (!user) {
+      console.log('No user, redirecting to signin');
+      router.replace("/signin?redirect=/dashboard");
+      return;
+    }
+    
+    // User exists, proceed with data fetching
+    if (!user) {
+      return;
+    }
+
+    // Only fetch if we have a user
+    if (!user) {
+      return;
+    }
+
+    const fetchData = async () => {
+      try {
+        // Get session token if available
+        const token = session?.access_token;
+        const [stocksResponse, portfolioResponse] = await Promise.all([
+          fetch("/api/stocks"),
+          fetch("/api/portfolio", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }),
+        ]);
+
+        const stocksData = await stocksResponse.json();
+        const portfolioData = await portfolioResponse.json();
+
         if (stocksData.error) {
-          console.error("API Error:", stocksData.error);
-          return;
+          console.error("Stocks API Error:", stocksData.error);
+          setStocks([]); // Set empty array on error
+        } else {
+          setStocks(stocksData);
         }
+
         if (portfolioData.error) {
           console.error("Portfolio API Error:", portfolioData.error);
-          return;
+          // Set default empty portfolio on error
+          setPortfolio({
+            accountBalance: 100000,
+            totalInvested: 0,
+            positions: [],
+            totalValue: 0,
+            totalGain: 0,
+            totalGainPercent: 0,
+            totalCost: 0,
+            watchlist: [],
+          });
+        } else {
+          // Ensure portfolio has all required fields
+          const totalCost = portfolioData.totalInvested || portfolioData.totalCost || 0;
+          setPortfolio({
+            accountBalance: portfolioData.accountBalance || 100000,
+            totalInvested: portfolioData.totalInvested || 0,
+            positions: portfolioData.positions || [],
+            totalValue: portfolioData.totalValue || 0,
+            totalGain: portfolioData.totalGain || 0,
+            totalGainPercent: portfolioData.totalGainPercent || 0,
+            totalCost: totalCost,
+            watchlist: portfolioData.watchlist || [],
+          });
         }
-        setStocks(stocksData);
-        setPortfolio(portfolioData);
-      })
-      .catch((err) => console.error("Failed to fetch data:", err));
-  }, []);
+      } catch (err) {
+        console.error("Failed to fetch data:", err);
+        // Set default values on error
+        setStocks([]);
+        setPortfolio({
+          accountBalance: 100000,
+          totalInvested: 0,
+          positions: [],
+          totalValue: 0,
+          totalGain: 0,
+          totalGainPercent: 0,
+          totalCost: 0,
+          watchlist: [],
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  if (!portfolio) {
+    fetchData();
+  }, [user, session, authLoading]);
+
+  // Debug logging
+  console.log('Dashboard render check:', {
+    authLoading,
+    loading,
+    hasUser: !!user,
+    hasSession: !!session,
+    hasPortfolio: !!portfolio,
+    userEmail: user?.email
+  });
+
+  if (authLoading || loading) {
+    console.log('Dashboard: Showing loading screen');
     return <Loading />;
   }
+
+  // Ensure portfolio is set before rendering
+  if (!portfolio) {
+    console.log('Dashboard: No portfolio, showing loading');
+    return <Loading />;
+  }
+
+  console.log('Dashboard: Rendering dashboard content');
 
   return (
     <div className="min-h-screen bg-dark-bg">

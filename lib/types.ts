@@ -22,8 +22,10 @@ export interface PortfolioPosition {
 }
 
 export interface Portfolio {
+  accountBalance?: number;
+  totalInvested?: number;
   totalValue: number;
-  totalCost: number;
+  totalCost?: number;
   totalGain: number;
   totalGainPercent: number;
   positions: PortfolioPosition[];

@@ -77,17 +77,17 @@ npm run dev
 │   └── utils.ts            # Utility functions
 └── public/
     └── data/
-        └── user.json        # User data
+        └── stocks.json      # Stock data (150+ stocks)
 ```
 
 ## 📊 Data Structure
 
-Data is fetched dynamically from Finnhub API:
+Data is stored in static JSON files for fast performance:
 
-- **Stock Data** - Fetched from `/api/stocks` endpoint (real-time quotes)
-- **Portfolio Data** - Fetched from `/api/portfolio` endpoint (real-time prices for positions)
-- **Stock History** - Fetched from `/api/stock/[symbol]/history` endpoint (time series/candlestick data)
-- **user.json** - User profile information and statistics (static for now)
+- **Stock Data** - Loaded from `/public/data/stocks.json` (150+ stocks with realistic data)
+- **Portfolio Data** - Fetched from `/api/portfolio` endpoint (uses static stock data)
+- **Stock History** - Generated dynamically from `/api/stock/[symbol]/history` endpoint (based on current price)
+- **User Data** - Stored in Supabase database (fully dynamic)
 
 ## 🎯 Key Components
 
@@ -115,7 +115,8 @@ The theme can be customized in `tailwind.config.ts`:
 
 ## 📝 Notes
 
-- **API Integration**: All stock data is fetched from Finnhub API
+- **Static Data**: All stock data is loaded from JSON files for fast performance (150+ stocks)
+- **Supabase Integration**: User data, portfolio, and transactions stored in Supabase
 - **Real-Time Data**: Prices and portfolio values update dynamically from live API
 - **Caching**: API calls are cached (30-60 seconds) to reduce API usage and improve performance
 - **UI Only**: Trading modals are for display purposes only

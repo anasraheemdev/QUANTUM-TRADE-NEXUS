@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Home,
@@ -12,17 +12,24 @@ import {
   BarChart3,
   Settings,
   X,
+  LogOut,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
 
-const menuItems = [
-  { icon: Home, label: "Home", href: "/" },
-  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
-  { icon: TrendingUp, label: "Markets", href: "/markets" },
-  { icon: Wallet, label: "Portfolio", href: "/dashboard" },
-  { icon: BarChart3, label: "Analytics", href: "/dashboard" },
-  { icon: User, label: "Profile", href: "/profile" },
-  { icon: Settings, label: "Settings", href: "/profile" },
+// Public menu items (always visible)
+const publicMenuItems = [
+  { icon: Home, label: "Home", href: "/", requiresAuth: false },
+  { icon: TrendingUp, label: "Markets", href: "/markets", requiresAuth: false },
+];
+
+// Protected menu items (only visible when authenticated)
+const protectedMenuItems = [
+  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard", requiresAuth: true },
+  { icon: Wallet, label: "Portfolio", href: "/dashboard", requiresAuth: true },
+  { icon: BarChart3, label: "Analytics", href: "/dashboard", requiresAuth: true },
+  { icon: User, label: "Profile", href: "/profile", requiresAuth: true },
+  { icon: Settings, label: "Settings", href: "/profile", requiresAuth: true },
 ];
 
 interface SidebarProps {
@@ -32,10 +39,18 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen: controlledIsOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, signOut, loading: authLoading } = useAuth();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   
   const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : isMobileOpen;
   const setIsOpen = onClose ? onClose : setIsMobileOpen;
+
+  // Get menu items based on auth status
+  const menuItems = [
+    ...publicMenuItems,
+    ...(user ? protectedMenuItems : []),
+  ];
 
   // Close sidebar when route changes on mobile
   useEffect(() => {
@@ -44,6 +59,11 @@ export default function Sidebar({ isOpen: controlledIsOpen, onClose }: SidebarPr
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    setIsOpen(false);
+  };
 
   // Prevent body scroll when mobile menu is open
   useEffect(() => {
@@ -72,8 +92,15 @@ export default function Sidebar({ isOpen: controlledIsOpen, onClose }: SidebarPr
               transition={{ delay: index * 0.05 }}
             >
               <Link
-                href={item.href}
-                onClick={() => setIsOpen(false)}
+                href={item.requiresAuth && !user ? "/signin" : item.href}
+                onClick={(e) => {
+                  setIsOpen(false);
+                  // If protected route and not authenticated, redirect to signin
+                  if (item.requiresAuth && !user && !authLoading) {
+                    e.preventDefault();
+                    router.push(`/signin?redirect=${item.href}`);
+                  }
+                }}
                 className={`flex items-center gap-3 rounded-lg px-4 py-3 transition-all ${
                   isActive
                     ? "bg-blue-gradient text-white shadow-blue-glow"
@@ -89,13 +116,40 @@ export default function Sidebar({ isOpen: controlledIsOpen, onClose }: SidebarPr
       </div>
 
       {/* Bottom Section */}
-      <div className="mt-auto p-4 lg:p-6 border-t border-dark-border">
-        <div className="rounded-lg bg-dark-hover p-4 border border-dark-border">
-          <p className="text-sm text-blue-accent mb-2">Need Help?</p>
-          <p className="text-xs text-blue-accent/70">
-            Contact support for assistance with your trading account.
-          </p>
-        </div>
+      <div className="mt-auto p-4 lg:p-6 border-t border-dark-border space-y-2">
+        {user ? (
+          <>
+            <div className="rounded-lg bg-dark-hover p-4 border border-dark-border mb-2">
+              <p className="text-sm font-medium text-blue-accent mb-1">{user.email}</p>
+              <p className="text-xs text-blue-accent/70">
+                {user.user_metadata?.name || "Trader"}
+              </p>
+            </div>
+            <button
+              onClick={handleSignOut}
+              className="w-full flex items-center gap-3 rounded-lg px-4 py-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all"
+            >
+              <LogOut className="h-5 w-5 flex-shrink-0" />
+              <span className="font-medium">Sign Out</span>
+            </button>
+          </>
+        ) : (
+          <>
+            <Link
+              href="/signin"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center justify-center gap-2 rounded-lg px-4 py-3 bg-blue-gradient text-white font-medium hover:shadow-blue-glow transition-all"
+            >
+              Sign In
+            </Link>
+            <div className="rounded-lg bg-dark-hover p-4 border border-dark-border">
+              <p className="text-sm text-blue-accent mb-2">Need Help?</p>
+              <p className="text-xs text-blue-accent/70">
+                Contact support for assistance with your trading account.
+              </p>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

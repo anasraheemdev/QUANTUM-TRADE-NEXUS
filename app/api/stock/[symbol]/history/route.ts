@@ -1,36 +1,43 @@
 import { NextResponse } from 'next/server';
-import finnhub from 'finnhub';
+import fs from 'fs';
+import path from 'path';
 
-const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY || process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
-
-// Simple in-memory cache
-const cache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_DURATION = 60000; // 60 seconds cache for history
-
-// Helper function to wrap callback-based API calls in promises
-function stockCandlesPromise(client: any, symbol: string, resolution: string, from: number, to: number): Promise<any> {
-  return new Promise((resolve, reject) => {
-    client.stockCandles(symbol, resolution, from, to, (error: any, data: any, response: any) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve(data);
-      }
+// Helper function to generate historical data based on current price
+function generateHistory(symbol: string, name: string, currentPrice: number, days: number = 30) {
+  const lineData = [];
+  const candleData = [];
+  const basePrice = currentPrice * 0.85; // Start 15% lower
+  
+  for (let i = days; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    const dateStr = date.toISOString().split('T')[0];
+    
+    // Generate realistic price movement
+    const trend = (currentPrice - basePrice) / days;
+    const price = basePrice + (trend * (days - i)) + (Math.random() - 0.5) * currentPrice * 0.05;
+    const open = price * (1 + (Math.random() - 0.5) * 0.02);
+    const close = price;
+    const high = Math.max(open, close) * (1 + Math.random() * 0.03);
+    const low = Math.min(open, close) * (1 - Math.random() * 0.03);
+    const volume = Math.floor(1000000 + Math.random() * 5000000);
+    
+    lineData.push({
+      date: dateStr,
+      price: Math.round(price * 100) / 100,
     });
-  });
-}
-
-// Helper function to fetch company profile
-function companyProfilePromise(client: any, symbol: string): Promise<any> {
-  return new Promise((resolve, reject) => {
-    client.companyProfile({ symbol }, (error: any, data: any, response: any) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve(data);
-      }
+    
+    candleData.push({
+      date: dateStr,
+      open: Math.round(open * 100) / 100,
+      high: Math.round(high * 100) / 100,
+      low: Math.round(low * 100) / 100,
+      close: Math.round(close * 100) / 100,
+      volume: volume,
     });
-  });
+  }
+  
+  return { lineData, candleData };
 }
 
 export async function GET(
@@ -40,109 +47,30 @@ export async function GET(
   try {
     const { symbol } = params;
     const { searchParams } = new URL(request.url);
-    const interval = searchParams.get('interval') || '1day';
     const outputsize = parseInt(searchParams.get('outputsize') || '30', 10);
+    const symbolUpper = symbol.toUpperCase();
 
-    if (!FINNHUB_API_KEY) {
+    const filePath = path.join(process.cwd(), 'public', 'data', 'stocks.json');
+    const fileContents = fs.readFileSync(filePath, 'utf8');
+    const stocks = JSON.parse(fileContents);
+
+    const stock = stocks.find((s: any) => s.symbol === symbolUpper);
+
+    if (!stock) {
       return NextResponse.json(
-        { error: 'API key not configured' },
-        { status: 500 }
+        { error: 'Stock not found' },
+        { status: 404 }
       );
     }
 
-    // Check cache first
-    const cacheKey = `history-${symbol.toUpperCase()}-${interval}-${outputsize}`;
-    const cached = cache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      return NextResponse.json(cached.data);
-    }
-
-    // Map interval to Finnhub resolution
-    // Finnhub supports: 1, 5, 15, 30, 60, D, W, M
-    const resolutionMap: Record<string, string> = {
-      '1min': '1',
-      '5min': '5',
-      '15min': '15',
-      '30min': '30',
-      '1h': '60',
-      '1day': 'D',
-      '1week': 'W',
-      '1month': 'M',
-    };
-    const resolution = resolutionMap[interval] || 'D';
-
-    // Calculate time range (Finnhub requires Unix timestamps)
-    const to = Math.floor(Date.now() / 1000);
-    const from = to - (outputsize * 24 * 60 * 60); // Approximate days back
-
-    // Initialize Finnhub client
-    const finnhubClient = new finnhub.DefaultApi(FINNHUB_API_KEY);
-
-    const symbolUpper = symbol.toUpperCase();
-
-    // Fetch both candle data and profile in parallel with timeout
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('API request timeout')), 10000); // 10 second timeout
-    });
-
-    const [data, profile] = await Promise.all([
-      Promise.race([
-        stockCandlesPromise(finnhubClient, symbolUpper, resolution, from, to),
-        timeoutPromise,
-      ]).catch((err) => {
-        console.error(`Candles API error for ${symbolUpper}:`, err);
-        return null;
-      }),
-      Promise.race([
-        companyProfilePromise(finnhubClient, symbolUpper),
-        timeoutPromise,
-      ]).catch((err) => {
-        console.error(`Profile API error for ${symbolUpper}:`, err);
-        return null;
-      }),
-    ]);
-
-    // Check if API returned an error
-    if (!data || data.s === 'no_data' || data.s === 'error' || !data.c || data.c.length === 0) {
-      throw new Error('No data available');
-    }
-
-    // Extract name from profile API response
-    const name = profile?.name || symbolUpper;
-    
-    // Finnhub candle data: { c: [close prices], h: [high prices], l: [low prices], o: [open prices], t: [timestamps], v: [volumes], s: status }
-    const closes = data.c || [];
-    const opens = data.o || [];
-    const highs = data.h || [];
-    const lows = data.l || [];
-    const volumes = data.v || [];
-    const timestamps = data.t || [];
-
-    // Transform to line data (for line chart)
-    const lineData = timestamps.map((timestamp: number, index: number) => ({
-      date: new Date(timestamp * 1000).toISOString().split('T')[0],
-      price: parseFloat(closes[index]?.toString() || '0'),
-    }));
-
-    // Transform to candlestick data
-    const candleData = timestamps.map((timestamp: number, index: number) => ({
-      date: new Date(timestamp * 1000).toISOString().split('T')[0],
-      open: parseFloat(opens[index]?.toString() || '0'),
-      high: parseFloat(highs[index]?.toString() || '0'),
-      low: parseFloat(lows[index]?.toString() || '0'),
-      close: parseFloat(closes[index]?.toString() || '0'),
-      volume: parseInt(volumes[index]?.toString() || '0', 10),
-    }));
+    const { lineData, candleData } = generateHistory(stock.symbol, stock.name, stock.price, outputsize);
 
     const history = {
       symbol: symbolUpper,
-      name,
+      name: stock.name,
       lineData,
       candleData,
     };
-
-    // Cache the result
-    cache.set(cacheKey, { data: history, timestamp: Date.now() });
 
     return NextResponse.json(history);
   } catch (error) {

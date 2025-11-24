@@ -68,7 +68,7 @@ export default function PortfolioSummary({ portfolio }: PortfolioSummaryProps) {
           <Wallet className="h-5 w-5 text-blue-accent" />
         </div>
         <div className="text-2xl font-bold text-white">
-          {formatCurrency(portfolio.totalCost)}
+          {formatCurrency(portfolio.totalCost || portfolio.totalInvested || 0)}
         </div>
       </motion.div>
     </div>

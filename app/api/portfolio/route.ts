@@ -1,146 +1,116 @@
-import { NextResponse } from 'next/server';
-import finnhub from 'finnhub';
+import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@/lib/supabase";
+import fs from "fs";
+import path from "path";
 
-const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY || process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
-
-// Simple in-memory cache
-const cache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_DURATION = 30000; // 30 seconds cache
-
-// Portfolio positions (shares and average prices)
-const PORTFOLIO_POSITIONS = [
-  { symbol: 'AAPL', shares: 50, avgPrice: 170.00 },
-  { symbol: 'MSFT', shares: 30, avgPrice: 375.00 },
-  { symbol: 'GOOGL', shares: 40, avgPrice: 140.00 },
-  { symbol: 'TSLA', shares: 25, avgPrice: 250.00 },
-  { symbol: 'NVDA', shares: 15, avgPrice: 850.00 },
-  { symbol: 'META', shares: 20, avgPrice: 480.00 },
-];
-
-const WATCHLIST = ['AMZN', 'JPM', 'V', 'JNJ'];
-
-// Helper function to wrap callback-based API calls in promises
-function quotePromise(client: any, symbol: string): Promise<any> {
-  return new Promise((resolve, reject) => {
-    client.quote(symbol, (error: any, data: any, response: any) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve(data);
-      }
-    });
-  });
-}
-
-// Helper function to fetch company profile
-function companyProfilePromise(client: any, symbol: string): Promise<any> {
-  return new Promise((resolve, reject) => {
-    client.companyProfile({ symbol }, (error: any, data: any, response: any) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve(data);
-      }
-    });
-  });
-}
-
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    if (!FINNHUB_API_KEY) {
-      return NextResponse.json(
-        { error: 'API key not configured' },
-        { status: 500 }
-      );
+    const supabase = createServerClient();
+    
+    // Get auth token from request
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check cache first
-    const cacheKey = 'portfolio';
-    const cached = cache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      return NextResponse.json(cached.data);
+    const token = authHeader.replace("Bearer ", "");
+    
+    // Verify user token
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Initialize Finnhub client
-    const finnhubClient = new finnhub.DefaultApi(FINNHUB_API_KEY);
+    // Fetch user profile for account balance
+    const { data: userData } = await supabase
+      .from("users")
+      .select("account_balance, total_invested")
+      .eq("id", user.id)
+      .single();
 
-    // Fetch current prices and profiles for all positions in parallel
-    const positionPromises = PORTFOLIO_POSITIONS.map(async (position) => {
-      try {
-        // Fetch both quote and profile in parallel
-        const [quote, profile] = await Promise.all([
-          quotePromise(finnhubClient, position.symbol).catch(() => null),
-          companyProfilePromise(finnhubClient, position.symbol).catch(() => null),
-        ]);
+    // Fetch portfolio positions
+    const { data: positions, error: positionsError } = await supabase
+      .from("portfolio_positions")
+      .select("*")
+      .eq("user_id", user.id);
 
-        // Check if API returned an error
-        if (!quote || !quote.c) {
-          throw new Error('Invalid quote data');
-        }
+    if (positionsError) {
+      console.error("Error fetching positions:", positionsError);
+      return NextResponse.json({ error: "Failed to fetch portfolio" }, { status: 500 });
+    }
 
-        // Extract name from profile API response
-        const name = profile?.name || position.symbol;
-        const currentPrice = parseFloat(quote.c.toString());
-        const totalCost = position.shares * position.avgPrice;
-        const currentValue = position.shares * currentPrice;
-        const gain = currentValue - totalCost;
-        const gainPercent = totalCost !== 0 ? (gain / totalCost) * 100 : 0;
+    if (!positions || positions.length === 0) {
+      return NextResponse.json({
+        accountBalance: userData?.account_balance || 100000,
+        totalInvested: userData?.total_invested || 0,
+        positions: [],
+        totalValue: 0,
+        totalCost: 0,
+        totalGain: 0,
+        totalGainPercent: 0,
+        watchlist: [],
+      });
+    }
 
-        return {
-          symbol: position.symbol,
-          name,
-          shares: position.shares,
-          avgPrice: position.avgPrice,
-          currentPrice: currentPrice > 0 ? currentPrice : position.avgPrice,
-          totalCost: totalCost,
-          currentValue: currentPrice > 0 ? currentValue : totalCost,
-          gain: currentPrice > 0 ? gain : 0,
-          gainPercent: currentPrice > 0 ? gainPercent : 0,
-        };
-      } catch (error) {
-        console.error(`Error fetching ${position.symbol}:`, error);
-        // Return position with fallback data
-        const totalCost = position.shares * position.avgPrice;
-        return {
-          symbol: position.symbol,
-          name: position.symbol,
-          shares: position.shares,
-          avgPrice: position.avgPrice,
-          currentPrice: position.avgPrice,
-          totalCost: totalCost,
-          currentValue: totalCost,
-          gain: 0,
-          gainPercent: 0,
-        };
+    // Fetch current prices from static JSON
+    const filePath = path.join(process.cwd(), 'public', 'data', 'stocks.json');
+    const fileContents = fs.readFileSync(filePath, 'utf8');
+    const allStocks = JSON.parse(fileContents);
+    
+    const priceMap = new Map<string, { price: number; name: string }>();
+    positions.forEach((pos: any) => {
+      const stock = allStocks.find((s: any) => s.symbol === pos.symbol);
+      if (stock) {
+        // Add slight variation for realism
+        const variation = (Math.random() - 0.5) * 0.02;
+        const price = stock.price * (1 + variation);
+        priceMap.set(pos.symbol, { 
+          price: Math.round(price * 100) / 100, 
+          name: stock.name 
+        });
+      } else {
+        priceMap.set(pos.symbol, { price: pos.avg_price, name: pos.symbol });
       }
     });
 
-    const positions = await Promise.all(positionPromises);
+    // Calculate portfolio values
+    const portfolioPositions = positions.map((pos: any) => {
+      const currentData = priceMap.get(pos.symbol) || { price: pos.avg_price, name: pos.symbol };
+      const currentPrice = currentData.price || pos.avg_price;
+      const currentValue = pos.shares * currentPrice;
+      const gain = currentValue - pos.shares * pos.avg_price;
+      const gainPercent = pos.avg_price > 0 ? (gain / (pos.shares * pos.avg_price)) * 100 : 0;
 
-    // Calculate totals
-    const totalValue = positions.reduce((sum, pos) => sum + pos.currentValue, 0);
-    const totalCost = positions.reduce((sum, pos) => sum + pos.totalCost, 0);
-    const totalGain = totalValue - totalCost;
-    const totalGainPercent = totalCost !== 0 ? (totalGain / totalCost) * 100 : 0;
+      return {
+        symbol: pos.symbol,
+        name: currentData.name,
+        shares: parseFloat(pos.shares),
+        avgPrice: parseFloat(pos.avg_price),
+        currentPrice: currentPrice,
+        currentValue: currentValue,
+        gain: gain,
+        gainPercent: gainPercent,
+      };
+    });
 
-    const portfolio = {
-      totalValue,
-      totalCost,
-      totalGain,
-      totalGainPercent,
-      positions,
-      watchlist: WATCHLIST,
-    };
+    const totalValue = portfolioPositions.reduce((sum, pos) => sum + pos.currentValue, 0);
+    const totalInvested = portfolioPositions.reduce((sum, pos) => sum + pos.shares * pos.avgPrice, 0);
+    const totalGain = totalValue - totalInvested;
+    const totalGainPercent = totalInvested > 0 ? (totalGain / totalInvested) * 100 : 0;
 
-    // Cache the result
-    cache.set(cacheKey, { data: portfolio, timestamp: Date.now() });
-
-    return NextResponse.json(portfolio);
+    return NextResponse.json({
+      accountBalance: userData?.account_balance || 100000,
+      totalInvested: userData?.total_invested || totalInvested,
+      positions: portfolioPositions,
+      totalValue: totalValue,
+      totalCost: totalInvested,
+      totalGain: totalGain,
+      totalGainPercent: totalGainPercent,
+      watchlist: [], // TODO: Fetch from watchlist table if needed
+    });
   } catch (error) {
-    console.error('Error fetching portfolio:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch portfolio data', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    console.error("Error fetching portfolio:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
