@@ -1,4 +1,4 @@
-# TradeHub - Trading Platform UI
+# QUANTUM TRADE NEXUS - Trading Platform UI
 
 A modern, fully static trading platform built with Next.js 14 (App Router), featuring a beautiful bluish-dark theme with simulated live stock prices and comprehensive trading interface.
 
@@ -82,11 +82,11 @@ npm run dev
 
 ## 📊 Data Structure
 
-Data is fetched dynamically from TwelveData API:
+Data is fetched dynamically from Finnhub API:
 
 - **Stock Data** - Fetched from `/api/stocks` endpoint (real-time quotes)
 - **Portfolio Data** - Fetched from `/api/portfolio` endpoint (real-time prices for positions)
-- **Stock History** - Fetched from `/api/stock/[symbol]/history` endpoint (time series data)
+- **Stock History** - Fetched from `/api/stock/[symbol]/history` endpoint (time series/candlestick data)
 - **user.json** - User profile information and statistics (static for now)
 
 ## 🎯 Key Components
@@ -115,9 +115,9 @@ The theme can be customized in `tailwind.config.ts`:
 
 ## 📝 Notes
 
-- **API Integration**: All stock data is fetched from TwelveData API
+- **API Integration**: All stock data is fetched from Finnhub API
 - **Real-Time Data**: Prices and portfolio values update dynamically from live API
-- **Rate Limiting**: API calls are cached and throttled to respect TwelveData rate limits (8 requests/minute)
+- **Caching**: API calls are cached (30-60 seconds) to reduce API usage and improve performance
 - **UI Only**: Trading modals are for display purposes only
 - **Client-Side**: Data fetching happens client-side using Next.js API routes
 

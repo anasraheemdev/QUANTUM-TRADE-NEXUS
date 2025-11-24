@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
+import finnhub from 'finnhub';
 
-const TWELVEDATA_API_KEY = process.env.TWELVEDATA_API_KEY || process.env.NEXT_PUBLIC_TWELVEDATA_API_KEY;
+const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY || process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
 
 // Simple in-memory cache
 const cache = new Map<string, { data: any; timestamp: number }>();
@@ -20,6 +21,19 @@ const STOCK_METADATA: Record<string, { name: string; sector: string }> = {
   JNJ: { name: 'Johnson & Johnson', sector: 'Healthcare' },
 };
 
+// Helper function to wrap callback-based API calls in promises
+function quotePromise(client: any, symbol: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    client.quote(symbol, (error: any, data: any, response: any) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(data);
+      }
+    });
+  });
+}
+
 export async function GET(
   request: Request,
   { params }: { params: { symbol: string } }
@@ -27,7 +41,7 @@ export async function GET(
   try {
     const { symbol } = params;
 
-    if (!TWELVEDATA_API_KEY) {
+    if (!FINNHUB_API_KEY) {
       return NextResponse.json(
         { error: 'API key not configured' },
         { status: 500 }
@@ -41,39 +55,40 @@ export async function GET(
       return NextResponse.json(cached.data);
     }
 
-    // Fetch real-time quote
-    const url = `https://api.twelvedata.com/quote?symbol=${symbol}&apikey=${TWELVEDATA_API_KEY}`;
+    // Initialize Finnhub client
+    const finnhubClient = new finnhub.DefaultApi(FINNHUB_API_KEY);
 
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`TwelveData API error: ${response.status}`);
-    }
-
-    const quote = await response.json();
+    // Fetch real-time quote from Finnhub
+    const quote = await quotePromise(finnhubClient, symbol.toUpperCase());
 
     // Check if API returned an error
-    if (quote.status === 'error' || quote.code) {
-      throw new Error(quote.message || 'API error');
+    if (!quote || !quote.c) {
+      throw new Error('Invalid quote data');
     }
+
     const metadata = STOCK_METADATA[symbol.toUpperCase()];
 
-    const price = parseFloat(quote.close || quote.price || '0');
-    const previousClose = parseFloat(quote.previous_close || price.toString());
+    // Finnhub returns: { c: current, h: high, l: low, o: open, pc: previous_close, t: timestamp }
+    const price = parseFloat(quote.c.toString());
+    const previousClose = parseFloat(quote.pc.toString());
     const change = price - previousClose;
     const changePercent = previousClose !== 0 ? (change / previousClose) * 100 : 0;
-    const volume = parseInt(quote.volume || '0', 10);
-    const marketCap = parseFloat(quote.market_cap || '0');
+    const high = parseFloat(quote.h?.toString() || '0');
+    const low = parseFloat(quote.l?.toString() || '0');
+    const open = parseFloat(quote.o?.toString() || '0');
 
     const stock = {
       symbol: symbol.toUpperCase(),
-      name: metadata?.name || quote.name || symbol,
-      price: price || 0,
-      change: change || 0,
-      changePercent: changePercent || 0,
-      volume: volume || 0,
-      marketCap: marketCap || 0,
+      name: metadata?.name || symbol,
+      price: price > 0 ? price : 0,
+      change: price > 0 ? change : 0,
+      changePercent: price > 0 ? changePercent : 0,
+      volume: 0, // Finnhub quote doesn't include volume
+      marketCap: 0, // Need separate API call for market cap
       sector: metadata?.sector || 'Unknown',
+      high: high || 0,
+      low: low || 0,
+      open: open || 0,
     };
 
     // Cache the result
@@ -88,4 +103,3 @@ export async function GET(
     );
   }
 }
-

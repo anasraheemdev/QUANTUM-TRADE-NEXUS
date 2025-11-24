@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
+import finnhub from 'finnhub';
 
-const TWELVEDATA_API_KEY = process.env.TWELVEDATA_API_KEY || process.env.NEXT_PUBLIC_TWELVEDATA_API_KEY;
+const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY || process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
 
 // Simple in-memory cache
 const cache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_DURATION = 60000; // 60 seconds cache for history (less frequent updates)
+const CACHE_DURATION = 60000; // 60 seconds cache for history
 
 // Stock metadata
 const STOCK_METADATA: Record<string, { name: string; sector: string }> = {
@@ -20,6 +21,19 @@ const STOCK_METADATA: Record<string, { name: string; sector: string }> = {
   JNJ: { name: 'Johnson & Johnson', sector: 'Healthcare' },
 };
 
+// Helper function to wrap callback-based API calls in promises
+function stockCandlesPromise(client: any, symbol: string, resolution: string, from: number, to: number): Promise<any> {
+  return new Promise((resolve, reject) => {
+    client.stockCandles(symbol, resolution, from, to, (error: any, data: any, response: any) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(data);
+      }
+    });
+  });
+}
+
 export async function GET(
   request: Request,
   { params }: { params: { symbol: string } }
@@ -28,9 +42,9 @@ export async function GET(
     const { symbol } = params;
     const { searchParams } = new URL(request.url);
     const interval = searchParams.get('interval') || '1day';
-    const outputsize = searchParams.get('outputsize') || '30';
+    const outputsize = parseInt(searchParams.get('outputsize') || '30', 10);
 
-    if (!TWELVEDATA_API_KEY) {
+    if (!FINNHUB_API_KEY) {
       return NextResponse.json(
         { error: 'API key not configured' },
         { status: 500 }
@@ -44,54 +58,60 @@ export async function GET(
       return NextResponse.json(cached.data);
     }
 
-    // Fetch time series data
-    const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=${interval}&outputsize=${outputsize}&apikey=${TWELVEDATA_API_KEY}`;
+    // Map interval to Finnhub resolution
+    // Finnhub supports: 1, 5, 15, 30, 60, D, W, M
+    const resolutionMap: Record<string, string> = {
+      '1min': '1',
+      '5min': '5',
+      '15min': '15',
+      '30min': '30',
+      '1h': '60',
+      '1day': 'D',
+      '1week': 'W',
+      '1month': 'M',
+    };
+    const resolution = resolutionMap[interval] || 'D';
 
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`TwelveData API error: ${response.status}`);
-    }
+    // Calculate time range (Finnhub requires Unix timestamps)
+    const to = Math.floor(Date.now() / 1000);
+    const from = to - (outputsize * 24 * 60 * 60); // Approximate days back
 
-    const data = await response.json();
+    // Initialize Finnhub client
+    const finnhubClient = new finnhub.DefaultApi(FINNHUB_API_KEY);
+
+    // Fetch time series data from Finnhub
+    const data = await stockCandlesPromise(finnhubClient, symbol.toUpperCase(), resolution, from, to);
 
     // Check if API returned an error
-    if (data.status === 'error' || data.code) {
-      throw new Error(data.message || 'API error');
+    if (data.s === 'no_data' || data.s === 'error' || !data.c || data.c.length === 0) {
+      throw new Error('No data available');
     }
 
     const metadata = STOCK_METADATA[symbol.toUpperCase()];
-    const values = data.values || [];
-
-    // If no values, return empty data structure
-    if (!values || values.length === 0) {
-      return NextResponse.json({
-        symbol: symbol.toUpperCase(),
-        name: metadata?.name || symbol,
-        lineData: [],
-        candleData: [],
-      });
-    }
+    
+    // Finnhub candle data: { c: [close prices], h: [high prices], l: [low prices], o: [open prices], t: [timestamps], v: [volumes], s: status }
+    const closes = data.c || [];
+    const opens = data.o || [];
+    const highs = data.h || [];
+    const lows = data.l || [];
+    const volumes = data.v || [];
+    const timestamps = data.t || [];
 
     // Transform to line data (for line chart)
-    const lineData = values
-      .map((item: any) => ({
-        date: item.datetime,
-        price: parseFloat(item.close || '0'),
-      }))
-      .reverse(); // Reverse to show chronological order
+    const lineData = timestamps.map((timestamp: number, index: number) => ({
+      date: new Date(timestamp * 1000).toISOString().split('T')[0],
+      price: parseFloat(closes[index]?.toString() || '0'),
+    }));
 
     // Transform to candlestick data
-    const candleData = values
-      .map((item: any) => ({
-        date: item.datetime,
-        open: parseFloat(item.open || '0'),
-        high: parseFloat(item.high || '0'),
-        low: parseFloat(item.low || '0'),
-        close: parseFloat(item.close || '0'),
-        volume: parseInt(item.volume || '0', 10),
-      }))
-      .reverse();
+    const candleData = timestamps.map((timestamp: number, index: number) => ({
+      date: new Date(timestamp * 1000).toISOString().split('T')[0],
+      open: parseFloat(opens[index]?.toString() || '0'),
+      high: parseFloat(highs[index]?.toString() || '0'),
+      low: parseFloat(lows[index]?.toString() || '0'),
+      close: parseFloat(closes[index]?.toString() || '0'),
+      volume: parseInt(volumes[index]?.toString() || '0', 10),
+    }));
 
     const history = {
       symbol: symbol.toUpperCase(),
@@ -112,4 +132,3 @@ export async function GET(
     );
   }
 }
-
