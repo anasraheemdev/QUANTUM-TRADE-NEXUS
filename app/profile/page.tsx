@@ -180,7 +180,8 @@ export default function ProfilePage() {
     };
 
     fetchUserProfile();
-  }, [authUser, session, authLoading, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUser, session, authLoading]);
 
   const handleSave = async () => {
     if (!session || !user) return;

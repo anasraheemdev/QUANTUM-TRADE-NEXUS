@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Handle sign up - create user profile if it doesn't exist
-        if (event === 'SIGNED_UP' && session?.user) {
+        if (String(event) === 'SIGNED_UP' && session?.user) {
           try {
             const response = await fetch('/api/user/create', {
               method: 'POST',
