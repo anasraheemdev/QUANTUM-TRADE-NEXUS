@@ -143,7 +143,7 @@ export default function StockDetailsPage() {
                 <h2 className="text-xl sm:text-2xl font-bold text-red-400 mb-4">Error Loading Stock</h2>
                 <p className="text-sm sm:text-base text-blue-accent/70 mb-4">{error}</p>
                 <Link
-                  href="/"
+                  href="/markets"
                   className="inline-flex items-center gap-2 text-sm sm:text-base text-blue-accent hover:text-blue-primary transition-colors"
                 >
                   <ArrowLeft className="h-4 w-4" />
@@ -172,7 +172,7 @@ export default function StockDetailsPage() {
           <div className="max-w-7xl mx-auto">
             {/* Back Button */}
             <Link
-              href="/"
+              href="/markets"
               className="inline-flex items-center gap-2 text-sm sm:text-base text-blue-accent hover:text-blue-primary mb-4 sm:mb-6 transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />

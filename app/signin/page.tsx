@@ -43,7 +43,7 @@ export default function SignInPage() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-8"
         >
-          <Link href="/landing" className="inline-flex items-center gap-2 mb-4">
+          <Link href="/" className="inline-flex items-center gap-2 mb-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-gradient shadow-blue-glow">
               <TrendingUp className="h-7 w-7 text-white" />
             </div>
@@ -228,7 +228,7 @@ export default function SignInPage() {
           className="mt-6 text-center"
         >
           <Link
-            href="/landing"
+            href="/"
             className="text-blue-accent/70 hover:text-blue-primary transition-colors text-sm"
           >
             ← Back to home

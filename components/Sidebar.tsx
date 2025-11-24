@@ -18,7 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 const menuItems = [
   { icon: Home, label: "Home", href: "/" },
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
-  { icon: TrendingUp, label: "Markets", href: "/" },
+  { icon: TrendingUp, label: "Markets", href: "/markets" },
   { icon: Wallet, label: "Portfolio", href: "/dashboard" },
   { icon: BarChart3, label: "Analytics", href: "/dashboard" },
   { icon: User, label: "Profile", href: "/profile" },

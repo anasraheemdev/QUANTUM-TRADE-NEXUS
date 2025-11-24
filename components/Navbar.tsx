@@ -22,7 +22,7 @@ export default function Navbar() {
           {/* Left: Mobile Menu + Logo */}
           <div className="flex items-center gap-2 sm:gap-3">
             <MobileMenuButton onClick={() => setIsSidebarOpen(true)} />
-            <Link href="/landing" className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2">
               <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-blue-gradient shadow-blue-glow">
                 <TrendingUp className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
               </div>
@@ -38,17 +38,17 @@ export default function Navbar() {
           {/* Navigation Links - Desktop */}
           <div className="hidden md:flex items-center gap-4 lg:gap-6">
             <Link
-              href="/landing"
+              href="/"
               className={`text-sm transition-colors hover:text-blue-primary ${
-                pathname === "/landing" ? "text-blue-primary" : "text-blue-accent"
+                pathname === "/" ? "text-blue-primary" : "text-blue-accent"
               }`}
             >
               Home
             </Link>
             <Link
-              href="/"
+              href="/markets"
               className={`text-sm transition-colors hover:text-blue-primary ${
-                pathname === "/" ? "text-blue-primary" : "text-blue-accent"
+                pathname === "/markets" ? "text-blue-primary" : "text-blue-accent"
               }`}
             >
               Markets
