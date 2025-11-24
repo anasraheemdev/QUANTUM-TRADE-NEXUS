@@ -47,12 +47,12 @@ export default function PriceTicker({ stocks: initialStocks }: PriceTickerProps)
               key={`${stock.symbol}-${index}`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="flex items-center gap-4 px-6 py-3 border-r border-dark-border whitespace-nowrap"
+              className="flex items-center gap-2 sm:gap-4 px-3 sm:px-6 py-2 sm:py-3 border-r border-dark-border whitespace-nowrap"
             >
-              <span className="font-semibold text-blue-accent">{stock.symbol}</span>
-              <span className="text-white">{formatCurrency(stock.price)}</span>
+              <span className="font-semibold text-xs sm:text-sm text-blue-accent">{stock.symbol}</span>
+              <span className="text-xs sm:text-sm text-white">{formatCurrency(stock.price)}</span>
               <span
-                className={`font-medium ${
+                className={`text-xs sm:text-sm font-medium ${
                   isPositive ? "text-green-400" : "text-red-400"
                 }`}
               >

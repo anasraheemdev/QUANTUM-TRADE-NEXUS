@@ -28,3 +28,20 @@
   }
 }
 
+/* Mobile responsive breakpoints */
+@media (max-width: 640px) {
+  /* Small mobile adjustments */
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+/* Touch-friendly tap targets */
+@media (hover: none) and (pointer: coarse) {
+  button, a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+

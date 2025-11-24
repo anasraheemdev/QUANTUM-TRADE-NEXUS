@@ -32,14 +32,14 @@ export default function HomePage() {
       <PriceTicker stocks={stocks} />
       <div className="flex">
         <Sidebar />
-        <main className="flex-1 p-6 lg:p-8">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full lg:w-auto">
           <div className="max-w-7xl mx-auto">
             {/* Hero Section */}
-            <div className="mb-8">
+            <div className="mb-6 sm:mb-8">
               <motion.h1
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="text-4xl font-bold text-white mb-2"
+                className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2"
               >
                 Welcome to QUANTUM TRADE NEXUS
               </motion.h1>
@@ -47,7 +47,7 @@ export default function HomePage() {
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="text-blue-accent/70 text-lg"
+                className="text-blue-accent/70 text-sm sm:text-base lg:text-lg"
               >
                 Your gateway to modern trading and investment
               </motion.p>
@@ -59,7 +59,7 @@ export default function HomePage() {
               >
                 <Link
                   href="/landing"
-                  className="inline-flex items-center gap-2 text-blue-primary hover:text-blue-secondary transition-colors"
+                  className="inline-flex items-center gap-2 text-sm sm:text-base text-blue-primary hover:text-blue-secondary transition-colors"
                 >
                   ← Back to Landing Page
                 </Link>
@@ -67,14 +67,14 @@ export default function HomePage() {
             </div>
 
             {/* Market Movers */}
-            <div className="mb-8">
+            <div className="mb-6 sm:mb-8">
               <MarketMovers stocks={stocks} />
             </div>
 
             {/* All Stocks Grid */}
             <div>
-              <h2 className="text-2xl font-bold text-blue-accent mb-6">All Stocks</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-blue-accent mb-4 sm:mb-6">All Stocks</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                 {stocks.map((stock, index) => (
                   <StockCard key={stock.symbol} stock={stock} index={index} />
                 ))}

@@ -125,12 +125,12 @@ export default function StockChart({ history }: StockChartProps) {
   return (
     <div className="rounded-lg border border-dark-border bg-dark-card p-6">
       {/* Chart Type Selector */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-4 sm:mb-6 overflow-x-auto scrollbar-hide pb-2">
         {(["line", "candlestick", "volume"] as ChartType[]).map((type) => (
           <button
             key={type}
             onClick={() => setChartType(type)}
-            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${
               chartType === type
                 ? "bg-blue-gradient text-white shadow-blue-glow"
                 : "bg-dark-hover text-blue-accent hover:text-blue-primary"
@@ -142,7 +142,7 @@ export default function StockChart({ history }: StockChartProps) {
       </div>
 
       {/* Chart Container */}
-      <div className="h-96">
+      <div className="h-64 sm:h-80 lg:h-96">
         <ResponsiveContainer width="100%" height="100%">
           {chartType === "line" ? (
             <LineChart data={lineData}>

@@ -48,49 +48,49 @@ export default function DashboardPage() {
       <PriceTicker stocks={stocks} />
       <div className="flex">
         <Sidebar />
-        <main className="flex-1 p-6 lg:p-8">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full lg:w-auto">
           <div className="max-w-7xl mx-auto">
             {/* Header */}
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-8"
+              className="mb-6 sm:mb-8"
             >
-              <h1 className="text-4xl font-bold text-white mb-2">Dashboard</h1>
-              <p className="text-blue-accent/70 text-lg">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">Dashboard</h1>
+              <p className="text-blue-accent/70 text-sm sm:text-base lg:text-lg">
                 Overview of your portfolio and market activity
               </p>
             </motion.div>
 
             {/* Portfolio Summary */}
-            <div className="mb-8">
+            <div className="mb-6 sm:mb-8">
               <PortfolioSummary portfolio={portfolio} />
             </div>
 
             {/* Portfolio Positions */}
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold text-blue-accent mb-6">Your Positions</h2>
+            <div className="mb-6 sm:mb-8">
+              <h2 className="text-xl sm:text-2xl font-bold text-blue-accent mb-4 sm:mb-6">Your Positions</h2>
               <div className="rounded-lg border border-dark-border bg-dark-card overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
+                <div className="overflow-x-auto scrollbar-hide">
+                  <table className="w-full min-w-[600px]">
                     <thead className="bg-dark-hover border-b border-dark-border">
                       <tr>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-blue-accent">
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-blue-accent">
                           Symbol
                         </th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-blue-accent">
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-blue-accent">
                           Shares
                         </th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-blue-accent">
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-blue-accent">
                           Avg Price
                         </th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-blue-accent">
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-blue-accent">
                           Current Price
                         </th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-blue-accent">
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-blue-accent">
                           Value
                         </th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-blue-accent">
+                        <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-blue-accent">
                           Gain/Loss
                         </th>
                       </tr>
@@ -106,36 +106,36 @@ export default function DashboardPage() {
                             transition={{ delay: index * 0.1 }}
                             className="border-b border-dark-border hover:bg-dark-hover transition-colors"
                           >
-                            <td className="px-6 py-4">
+                            <td className="px-3 sm:px-6 py-3 sm:py-4">
                               <div>
-                                <div className="font-semibold text-blue-accent">
+                                <div className="font-semibold text-sm sm:text-base text-blue-accent">
                                   {position.symbol}
                                 </div>
-                                <div className="text-sm text-blue-accent/70">
+                                <div className="text-xs sm:text-sm text-blue-accent/70">
                                   {position.name}
                                 </div>
                               </div>
                             </td>
-                            <td className="px-6 py-4 text-white">{position.shares}</td>
-                            <td className="px-6 py-4 text-white">
+                            <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm sm:text-base text-white">{position.shares}</td>
+                            <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm sm:text-base text-white">
                               {formatCurrency(position.avgPrice)}
                             </td>
-                            <td className="px-6 py-4 text-white">
+                            <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm sm:text-base text-white">
                               {formatCurrency(position.currentPrice)}
                             </td>
-                            <td className="px-6 py-4 text-white">
+                            <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm sm:text-base text-white">
                               {formatCurrency(position.currentValue)}
                             </td>
-                            <td className="px-6 py-4">
+                            <td className="px-3 sm:px-6 py-3 sm:py-4">
                               <div
-                                className={`flex items-center gap-2 font-semibold ${
+                                className={`flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-semibold ${
                                   isPositive ? "text-green-400" : "text-red-400"
                                 }`}
                               >
                                 {isPositive ? (
-                                  <TrendingUp className="h-4 w-4" />
+                                  <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
                                 ) : (
-                                  <TrendingDown className="h-4 w-4" />
+                                  <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4" />
                                 )}
                                 <span>
                                   {formatCurrency(position.gain)} (
@@ -154,15 +154,15 @@ export default function DashboardPage() {
             </div>
 
             {/* Watchlist and Market Movers Side by Side */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
               <Watchlist portfolio={portfolio} allStocks={stocks} />
               <MarketMovers stocks={stocks} />
             </div>
 
             {/* Quick Access Stocks */}
             <div>
-              <h2 className="text-2xl font-bold text-blue-accent mb-6">Quick Access</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-blue-accent mb-4 sm:mb-6">Quick Access</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                 {stocks.slice(0, 4).map((stock, index) => (
                   <StockCard key={stock.symbol} stock={stock} index={index} />
                 ))}

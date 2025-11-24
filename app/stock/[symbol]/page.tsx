@@ -136,14 +136,14 @@ export default function StockDetailsPage() {
         <Navbar />
         <div className="flex">
           <Sidebar />
-          <main className="flex-1 p-6 lg:p-8">
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full lg:w-auto">
             <div className="max-w-7xl mx-auto">
-              <div className="rounded-lg border border-red-500 bg-dark-card p-6">
-                <h2 className="text-2xl font-bold text-red-400 mb-4">Error Loading Stock</h2>
-                <p className="text-blue-accent/70 mb-4">{error}</p>
+              <div className="rounded-lg border border-red-500 bg-dark-card p-4 sm:p-6">
+                <h2 className="text-xl sm:text-2xl font-bold text-red-400 mb-4">Error Loading Stock</h2>
+                <p className="text-sm sm:text-base text-blue-accent/70 mb-4">{error}</p>
                 <Link
                   href="/"
-                  className="inline-flex items-center gap-2 text-blue-accent hover:text-blue-primary transition-colors"
+                  className="inline-flex items-center gap-2 text-sm sm:text-base text-blue-accent hover:text-blue-primary transition-colors"
                 >
                   <ArrowLeft className="h-4 w-4" />
                   <span>Back to Markets</span>
@@ -167,12 +167,12 @@ export default function StockDetailsPage() {
       <Navbar />
       <div className="flex">
         <Sidebar />
-        <main className="flex-1 p-6 lg:p-8">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full lg:w-auto">
           <div className="max-w-7xl mx-auto">
             {/* Back Button */}
             <Link
               href="/"
-              className="inline-flex items-center gap-2 text-blue-accent hover:text-blue-primary mb-6 transition-colors"
+              className="inline-flex items-center gap-2 text-sm sm:text-base text-blue-accent hover:text-blue-primary mb-4 sm:mb-6 transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />
               <span>Back to Markets</span>
@@ -182,27 +182,27 @@ export default function StockDetailsPage() {
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-8"
+              className="mb-6 sm:mb-8"
             >
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                  <h1 className="text-4xl font-bold text-white mb-2">{stock.symbol}</h1>
-                  <p className="text-blue-accent/70 text-lg">{stock.name}</p>
+                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">{stock.symbol}</h1>
+                  <p className="text-sm sm:text-base lg:text-lg text-blue-accent/70">{stock.name}</p>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 sm:gap-4">
                   <button
                     onClick={() => setIsBuyModalOpen(true)}
-                    className="flex items-center gap-2 px-6 py-3 rounded-lg bg-green-500 hover:bg-green-600 text-white font-semibold transition-all shadow-lg shadow-green-500/50"
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm sm:text-base font-semibold transition-all shadow-lg shadow-green-500/50"
                   >
-                    <ShoppingCart className="h-5 w-5" />
-                    Buy
+                    <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="hidden xs:inline">Buy</span>
                   </button>
                   <button
                     onClick={() => setIsSellModalOpen(true)}
-                    className="flex items-center gap-2 px-6 py-3 rounded-lg bg-red-500 hover:bg-red-600 text-white font-semibold transition-all shadow-lg shadow-red-500/50"
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm sm:text-base font-semibold transition-all shadow-lg shadow-red-500/50"
                   >
-                    <ShoppingCart className="h-5 w-5" />
-                    Sell
+                    <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="hidden xs:inline">Sell</span>
                   </button>
                 </div>
               </div>
@@ -213,20 +213,20 @@ export default function StockDetailsPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8"
+              className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8"
             >
-              <div className="rounded-lg border border-dark-border bg-dark-card p-6">
-                <div className="text-sm text-blue-accent/70 mb-2">Current Price</div>
-                <div className="text-3xl font-bold text-white">{formatCurrency(stock.price)}</div>
+              <div className="rounded-lg border border-dark-border bg-dark-card p-4 sm:p-6">
+                <div className="text-xs sm:text-sm text-blue-accent/70 mb-2">Current Price</div>
+                <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-white">{formatCurrency(stock.price)}</div>
                 <div
-                  className={`flex items-center gap-2 mt-2 text-sm font-medium ${
+                  className={`flex items-center gap-1 sm:gap-2 mt-2 text-xs sm:text-sm font-medium ${
                     isPositive ? "text-green-400" : "text-red-400"
                   }`}
                 >
                   {isPositive ? (
-                    <TrendingUp className="h-4 w-4" />
+                    <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
                   ) : (
-                    <TrendingDown className="h-4 w-4" />
+                    <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4" />
                   )}
                   <span>
                     {formatCurrency(Math.abs(stock.change))} ({formatPercent(stock.changePercent)})
@@ -234,23 +234,23 @@ export default function StockDetailsPage() {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-dark-border bg-dark-card p-6">
-                <div className="text-sm text-blue-accent/70 mb-2">Market Cap</div>
-                <div className="text-2xl font-bold text-white">
+              <div className="rounded-lg border border-dark-border bg-dark-card p-4 sm:p-6">
+                <div className="text-xs sm:text-sm text-blue-accent/70 mb-2">Market Cap</div>
+                <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">
                   {formatLargeNumber(stock.marketCap)}
                 </div>
               </div>
 
-              <div className="rounded-lg border border-dark-border bg-dark-card p-6">
-                <div className="text-sm text-blue-accent/70 mb-2">Volume</div>
-                <div className="text-2xl font-bold text-white">
+              <div className="rounded-lg border border-dark-border bg-dark-card p-4 sm:p-6">
+                <div className="text-xs sm:text-sm text-blue-accent/70 mb-2">Volume</div>
+                <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">
                   {formatLargeNumber(stock.volume)}
                 </div>
               </div>
 
-              <div className="rounded-lg border border-dark-border bg-dark-card p-6">
-                <div className="text-sm text-blue-accent/70 mb-2">Sector</div>
-                <div className="text-2xl font-bold text-blue-primary">{stock.sector}</div>
+              <div className="rounded-lg border border-dark-border bg-dark-card p-4 sm:p-6">
+                <div className="text-xs sm:text-sm text-blue-accent/70 mb-2">Sector</div>
+                <div className="text-lg sm:text-xl lg:text-2xl font-bold text-blue-primary">{stock.sector}</div>
               </div>
             </motion.div>
 
@@ -260,7 +260,7 @@ export default function StockDetailsPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="mb-8"
+                className="mb-6 sm:mb-8"
               >
                 <StockChart history={history} />
               </motion.div>
@@ -269,10 +269,10 @@ export default function StockDetailsPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="mb-8"
+                className="mb-6 sm:mb-8"
               >
-                <div className="rounded-lg border border-dark-border bg-dark-card p-6">
-                  <p className="text-blue-accent/70">
+                <div className="rounded-lg border border-dark-border bg-dark-card p-4 sm:p-6">
+                  <p className="text-sm sm:text-base text-blue-accent/70">
                     Chart data is currently unavailable. Please try refreshing the page.
                   </p>
                 </div>
@@ -284,11 +284,11 @@ export default function StockDetailsPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="grid grid-cols-1 md:grid-cols-2 gap-6"
+              className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6"
             >
-              <div className="rounded-lg border border-dark-border bg-dark-card p-6">
-                <h3 className="text-xl font-bold text-blue-accent mb-4">About {stock.name}</h3>
-                <p className="text-blue-accent/70 leading-relaxed">
+              <div className="rounded-lg border border-dark-border bg-dark-card p-4 sm:p-6">
+                <h3 className="text-lg sm:text-xl font-bold text-blue-accent mb-3 sm:mb-4">About {stock.name}</h3>
+                <p className="text-sm sm:text-base text-blue-accent/70 leading-relaxed">
                   {stock.name} is a leading company in the {stock.sector} sector. The stock has
                   shown {isPositive ? "positive" : "negative"} performance with a current price of{" "}
                   {formatCurrency(stock.price)}. Market capitalization stands at{" "}
@@ -297,30 +297,30 @@ export default function StockDetailsPage() {
                 </p>
               </div>
 
-              <div className="rounded-lg border border-dark-border bg-dark-card p-6">
-                <h3 className="text-xl font-bold text-blue-accent mb-4">Key Metrics</h3>
-                <div className="space-y-3">
+              <div className="rounded-lg border border-dark-border bg-dark-card p-4 sm:p-6">
+                <h3 className="text-lg sm:text-xl font-bold text-blue-accent mb-3 sm:mb-4">Key Metrics</h3>
+                <div className="space-y-2 sm:space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-blue-accent/70">52 Week High</span>
-                    <span className="text-white font-semibold">
+                    <span className="text-xs sm:text-sm text-blue-accent/70">52 Week High</span>
+                    <span className="text-sm sm:text-base text-white font-semibold">
                       {formatCurrency(stock.price * 1.2)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-blue-accent/70">52 Week Low</span>
-                    <span className="text-white font-semibold">
+                    <span className="text-xs sm:text-sm text-blue-accent/70">52 Week Low</span>
+                    <span className="text-sm sm:text-base text-white font-semibold">
                       {formatCurrency(stock.price * 0.8)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-blue-accent/70">Average Volume</span>
-                    <span className="text-white font-semibold">
+                    <span className="text-xs sm:text-sm text-blue-accent/70">Average Volume</span>
+                    <span className="text-sm sm:text-base text-white font-semibold">
                       {formatLargeNumber(stock.volume * 0.9)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-blue-accent/70">P/E Ratio</span>
-                    <span className="text-white font-semibold">28.5</span>
+                    <span className="text-xs sm:text-sm text-blue-accent/70">P/E Ratio</span>
+                    <span className="text-sm sm:text-base text-white font-semibold">28.5</span>
                   </div>
                 </div>
               </div>
