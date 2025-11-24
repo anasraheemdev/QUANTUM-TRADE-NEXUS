@@ -103,7 +103,7 @@ export default function Sidebar({ isOpen: controlledIsOpen, onClose }: SidebarPr
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex flex-col w-64 border-r border-dark-border bg-dark-card h-screen sticky top-0">
+      <aside className="hidden lg:flex flex-col w-64 border-r border-dark-border bg-dark-card sticky top-16 overflow-y-auto scrollbar-hide" style={{ height: 'calc(100vh - 4rem)' }}>
         {sidebarContent}
       </aside>
 

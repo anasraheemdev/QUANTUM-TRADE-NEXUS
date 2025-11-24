@@ -135,7 +135,7 @@ export default function StockDetailsPage() {
     return (
       <div className="min-h-screen bg-dark-bg">
         <Navbar />
-        <div className="flex">
+        <div className="flex" style={{ minHeight: 'calc(100vh - 4rem)' }}>
           <Sidebar />
           <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full lg:w-auto">
             <div className="max-w-7xl mx-auto">
@@ -164,11 +164,11 @@ export default function StockDetailsPage() {
   const isPositive = stock.change >= 0;
 
   return (
-    <div className="min-h-screen bg-dark-bg">
-      <Navbar />
-      <div className="flex">
-        <Sidebar />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full lg:w-auto">
+      <div className="min-h-screen bg-dark-bg">
+        <Navbar />
+        <div className="flex" style={{ minHeight: 'calc(100vh - 4rem)' }}>
+          <Sidebar />
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full lg:w-auto">
           <div className="max-w-7xl mx-auto">
             {/* Back Button */}
             <Link
