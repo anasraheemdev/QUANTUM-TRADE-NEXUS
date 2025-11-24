@@ -1,0 +1,27 @@
+{
+  "id": "user_001",
+  "name": "John Doe",
+  "email": "john.doe@example.com",
+  "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=John",
+  "accountBalance": 15230.75,
+  "totalInvested": 118000.00,
+  "memberSince": "2023-01-15",
+  "tradingLevel": "Intermediate",
+  "preferences": {
+    "theme": "dark",
+    "notifications": true,
+    "twoFactorAuth": false
+  },
+  "stats": {
+    "totalTrades": 127,
+    "winRate": 68.5,
+    "avgReturn": 12.3,
+    "bestTrade": {
+      "symbol": "NVDA",
+      "gain": 1250.00,
+      "date": "2024-01-20"
+    }
+  }
+}
+
+
