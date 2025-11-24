@@ -46,9 +46,9 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-dark-bg">
       <Navbar />
       <PriceTicker stocks={stocks} />
-      <div className="flex" style={{ minHeight: 'calc(100vh - 4rem - 3rem)' }}>
+      <div className="flex pt-0 lg:pt-0">
         <Sidebar />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full lg:w-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full lg:ml-64">
           <div className="max-w-7xl mx-auto">
             {/* Header */}
             <motion.div
