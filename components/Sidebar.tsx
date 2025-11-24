@@ -29,6 +29,7 @@ const protectedMenuItems = [
   { icon: Wallet, label: "Portfolio", href: "/dashboard", requiresAuth: true },
   { icon: BarChart3, label: "Analytics", href: "/dashboard", requiresAuth: true },
   { icon: User, label: "Profile", href: "/profile", requiresAuth: true },
+  { icon: User, label: "Find Users", href: "/users", requiresAuth: true },
   { icon: Settings, label: "Settings", href: "/profile", requiresAuth: true },
 ];
 

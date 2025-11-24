@@ -57,16 +57,20 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Generate unique user ID
+    const uniqueId = `USER${Math.floor(100000 + Math.random() * 900000)}`;
+    
     const { data: newUser, error: insertError } = await supabase
       .from("users")
       .insert({
         id: userId, // This must be UUID type in database
         email: email,
         name: name || email.split("@")[0] || "User",
-        account_balance: 100000,
+        account_balance: 1500,
         total_invested: 0,
         trading_level: "Beginner",
         member_since: new Date().toISOString(),
+        unique_user_id: uniqueId,
       })
       .select()
       .single();

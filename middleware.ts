@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 
 export function middleware(req: NextRequest) {
   // Protected routes that require authentication
-  const protectedRoutes = ['/dashboard', '/profile'];
+  const protectedRoutes = ['/dashboard', '/profile', '/users'];
   const isProtectedRoute = protectedRoutes.some((route) =>
     req.nextUrl.pathname.startsWith(route)
   );

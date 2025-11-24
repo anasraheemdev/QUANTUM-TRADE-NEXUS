@@ -21,6 +21,7 @@ import Loading from "@/components/Loading";
 
 interface UserProfile {
   id: string;
+  unique_user_id?: string;
   email: string;
   name: string;
   avatar_url: string | null;
@@ -180,6 +181,19 @@ export default function ProfilePage() {
     };
 
     fetchUserProfile();
+    
+    // Refresh user data when page becomes visible (after transfer)
+    const handleVisibilityChange = () => {
+      if (!document.hidden && authUser && session) {
+        fetchUserProfile();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authUser, session, authLoading]);
 
@@ -487,6 +501,47 @@ export default function ProfilePage() {
                   </div>
                 </div>
               </div>
+            </motion.div>
+
+            {/* Unique User ID */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+              className="rounded-lg border border-dark-border bg-dark-card p-4 sm:p-6"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg sm:text-xl font-bold text-blue-accent flex items-center gap-2">
+                  <UserIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                  Your Unique ID
+                </h3>
+                {user.unique_user_id && (
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(user.unique_user_id!);
+                      // You could add a toast notification here
+                      alert("Copied to clipboard!");
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-blue-gradient text-white text-xs sm:text-sm font-medium hover:shadow-blue-glow transition-all"
+                  >
+                    Copy ID
+                  </button>
+                )}
+              </div>
+              {user.unique_user_id ? (
+                <div>
+                  <p className="text-2xl sm:text-3xl font-bold text-blue-primary font-mono mb-2">
+                    {user.unique_user_id}
+                  </p>
+                  <p className="text-xs sm:text-sm text-blue-accent/70">
+                    Share this ID with others so they can send you credits directly!
+                  </p>
+                </div>
+              ) : (
+                <p className="text-blue-accent/70 text-sm">
+                  Your unique ID is being generated...
+                </p>
+              )}
             </motion.div>
           </div>
         </main>
