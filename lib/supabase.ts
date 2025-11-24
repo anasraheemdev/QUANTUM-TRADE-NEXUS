@@ -53,8 +53,12 @@ export function createServerClient() {
  * ⚠️  WARNING: Use with caution - this bypasses all security policies
  */
 export function createAdminClient() {
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error('Supabase service role key is not configured');
+  if (!supabaseUrl) {
+    throw new Error('Supabase URL is not configured');
+  }
+  
+  if (!supabaseServiceKey) {
+    throw new Error('Supabase service role key is not configured. Please set SUPABASE_SERVICE_ROLE_KEY in your environment variables.');
   }
   
   return createClient(supabaseUrl, supabaseServiceKey, {
@@ -63,6 +67,19 @@ export function createAdminClient() {
       autoRefreshToken: false,
     },
   });
+}
+
+/**
+ * Safely create admin client with fallback
+ * Returns null if admin client cannot be created
+ */
+export function tryCreateAdminClient() {
+  try {
+    return createAdminClient();
+  } catch (error) {
+    console.warn('Admin client not available:', error instanceof Error ? error.message : 'Unknown error');
+    return null;
+  }
 }
 
 // Export configuration for debugging (client-side only)

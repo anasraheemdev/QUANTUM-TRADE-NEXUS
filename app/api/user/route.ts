@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient, createAdminClient } from "@/lib/supabase";
+import { createServerClient, tryCreateAdminClient } from "@/lib/supabase";
 
 // Force dynamic rendering - this route uses request headers
 export const dynamic = 'force-dynamic';
@@ -21,11 +21,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Fetch user profile - use admin client to ensure we get latest data
-    // This bypasses any potential caching issues and RLS
-    const adminSupabase = createAdminClient();
+    // Fetch user profile - try admin client first, fallback to regular client
+    // Admin client ensures we get latest data and bypasses RLS
+    const adminSupabase = tryCreateAdminClient();
+    const clientToUse = adminSupabase || supabase;
     
-    const { data: userData, error } = await adminSupabase
+    const { data: userData, error } = await clientToUse
       .from("users")
       .select("*")
       .eq("id", user.id)
@@ -38,10 +39,11 @@ export async function GET(request: NextRequest) {
       // Generate unique user ID
       const uniqueId = `USER${Math.floor(100000 + Math.random() * 900000)}`;
       
-      // Use admin client for user creation to bypass RLS
-      const adminSupabase = createAdminClient();
+      // Use admin client for user creation to bypass RLS, fallback to regular if needed
+      const adminSupabaseForInsert = tryCreateAdminClient();
+      const insertClient = adminSupabaseForInsert || supabase;
       
-      const { data: newUser, error: insertError } = await adminSupabase
+      const { data: newUser, error: insertError } = await insertClient
         .from("users")
         .insert({
           id: user.id,
@@ -55,7 +57,7 @@ export async function GET(request: NextRequest) {
         })
         .select()
         .single();
-
+      
       if (insertError) {
         console.error("Error creating user profile:", insertError);
         console.error("Insert error details:", JSON.stringify(insertError, null, 2));
@@ -100,10 +102,11 @@ export async function GET(request: NextRequest) {
         uniqueId = `USER${Date.now().toString().slice(-6)}`;
       }
       
-      // Update user with unique ID - use admin client
-      const adminSupabase = createAdminClient();
+      // Update user with unique ID - try admin client, fallback to regular
+      const adminSupabaseForUpdate = tryCreateAdminClient();
+      const updateClient = adminSupabaseForUpdate || supabase;
       
-      const { data: updatedUser, error: updateError } = await adminSupabase
+      const { data: updatedUser, error: updateError } = await updateClient
         .from("users")
         .update({ unique_user_id: uniqueId })
         .eq("id", user.id)

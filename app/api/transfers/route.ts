@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient, createAdminClient } from "@/lib/supabase";
+import { createServerClient, tryCreateAdminClient } from "@/lib/supabase";
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -8,7 +8,18 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createServerClient();
     // Use admin client for balance updates to bypass RLS
-    const adminSupabase = createAdminClient();
+    // If service key is not available, return helpful error
+    const adminSupabase = tryCreateAdminClient();
+    
+    if (!adminSupabase) {
+      return NextResponse.json(
+        { 
+          error: "Service role key not configured", 
+          details: "SUPABASE_SERVICE_ROLE_KEY is required for credit transfers. Please configure it in Vercel environment variables."
+        },
+        { status: 500 }
+      );
+    }
     
     // Get auth token from request
     const authHeader = request.headers.get("authorization");
