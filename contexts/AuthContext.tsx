@@ -167,6 +167,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setTimeout(async () => {
           try {
             // Check if profile was created by trigger
+            if (!data.user) {
+              console.log('No user in data, skipping profile check');
+              return;
+            }
+            
             const { data: profile, error: checkError } = await supabase
               .from('users')
               .select('id')

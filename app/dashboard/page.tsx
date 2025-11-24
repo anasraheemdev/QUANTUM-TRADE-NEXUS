@@ -116,6 +116,7 @@ export default function DashboardPage() {
     };
 
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, session, authLoading]);
 
   // Debug logging
