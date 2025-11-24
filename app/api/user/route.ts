@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
       console.log("User exists but missing unique_user_id, generating one...");
       
       // Generate unique user ID (keep trying until we get a unique one)
-      let uniqueId: string;
+      let uniqueId: string = `USER${Date.now().toString().slice(-6)}`; // Initialize with fallback
       let attempts = 0;
       let isUnique = false;
       
