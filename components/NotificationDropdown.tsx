@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, X, ArrowUpRight, ArrowDownRight, DollarSign, Check } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -32,36 +32,8 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      fetchNotifications();
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isOpen, session]);
-
-  // Poll for new notifications every 30 seconds
-  useEffect(() => {
-    if (!session) return;
-
-    const interval = setInterval(() => {
-      fetchNotifications();
-    }, 30000); // Poll every 30 seconds
-
-    return () => clearInterval(interval);
-  }, [session]);
-
-  const fetchNotifications = async () => {
+  // Fetch notifications function
+  const fetchNotifications = useCallback(async () => {
     if (!session) return;
 
     setLoading(true);
@@ -83,7 +55,36 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
     } finally {
       setLoading(false);
     }
-  };
+  }, [session]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      fetchNotifications();
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen, session, fetchNotifications, onClose]);
+
+  // Poll for new notifications every 30 seconds
+  useEffect(() => {
+    if (!session) return;
+
+    const interval = setInterval(() => {
+      fetchNotifications();
+    }, 30000); // Poll every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [session, fetchNotifications]);
 
   const getNotificationIcon = (notification: Notification) => {
     if (notification.isReceived) {
@@ -152,7 +153,7 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
                   <Bell className="h-12 w-12 text-blue-accent/30 mx-auto mb-4" />
                   <p className="text-blue-accent/70">No notifications yet</p>
                   <p className="text-blue-accent/50 text-sm mt-2">
-                    You'll see credit transfers here
+                    You&apos;ll see credit transfers here
                   </p>
                 </div>
               ) : (
