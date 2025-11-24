@@ -10,24 +10,23 @@ const STOCK_SYMBOLS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 
 const cache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_DURATION = 30000; // 30 seconds cache
 
-// Stock metadata (name, sector)
-const STOCK_METADATA: Record<string, { name: string; sector: string }> = {
-  AAPL: { name: 'Apple Inc.', sector: 'Technology' },
-  MSFT: { name: 'Microsoft Corporation', sector: 'Technology' },
-  GOOGL: { name: 'Alphabet Inc.', sector: 'Technology' },
-  AMZN: { name: 'Amazon.com Inc.', sector: 'Consumer Cyclical' },
-  TSLA: { name: 'Tesla, Inc.', sector: 'Consumer Cyclical' },
-  META: { name: 'Meta Platforms Inc.', sector: 'Technology' },
-  NVDA: { name: 'NVIDIA Corporation', sector: 'Technology' },
-  JPM: { name: 'JPMorgan Chase & Co.', sector: 'Financial Services' },
-  V: { name: 'Visa Inc.', sector: 'Financial Services' },
-  JNJ: { name: 'Johnson & Johnson', sector: 'Healthcare' },
-};
-
 // Helper function to wrap callback-based API calls in promises
 function quotePromise(client: any, symbol: string): Promise<any> {
   return new Promise((resolve, reject) => {
     client.quote(symbol, (error: any, data: any, response: any) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(data);
+      }
+    });
+  });
+}
+
+// Helper function to fetch company profile
+function companyProfilePromise(client: any, symbol: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    client.companyProfile({ symbol }, (error: any, data: any, response: any) => {
       if (error) {
         reject(error);
       } else {
@@ -56,17 +55,24 @@ export async function GET() {
     // Initialize Finnhub client
     const finnhubClient = new finnhub.DefaultApi(FINNHUB_API_KEY);
 
-    // Fetch quotes for all stocks in parallel (Finnhub allows multiple requests)
-    const quotePromises = STOCK_SYMBOLS.map(async (symbol) => {
+    // Fetch quotes and profiles for all stocks in parallel
+    const stockPromises = STOCK_SYMBOLS.map(async (symbol) => {
       try {
-        const quote = await quotePromise(finnhubClient, symbol);
+        // Fetch both quote and profile in parallel
+        const [quote, profile] = await Promise.all([
+          quotePromise(finnhubClient, symbol).catch(() => null),
+          companyProfilePromise(finnhubClient, symbol).catch(() => null),
+        ]);
 
         // Finnhub returns: { c: current, h: high, l: low, o: open, pc: previous_close, t: timestamp }
         if (!quote || !quote.c) {
           throw new Error('Invalid quote data');
         }
 
-        const metadata = STOCK_METADATA[symbol];
+        // Extract metadata from profile API response
+        const name = profile?.name || symbol;
+        const sector = profile?.finnhubIndustry || profile?.gicsSector || 'Unknown';
+
         const price = parseFloat(quote.c.toString());
         const previousClose = parseFloat(quote.pc.toString());
         const change = price - previousClose;
@@ -77,13 +83,13 @@ export async function GET() {
 
         return {
           symbol,
-          name: metadata?.name || symbol,
+          name,
           price: price || 0,
           change: change || 0,
           changePercent: changePercent || 0,
           volume: 0, // Finnhub quote doesn't include volume
-          marketCap: 0, // Need separate API call for market cap
-          sector: metadata?.sector || 'Unknown',
+          marketCap: profile?.marketCapitalization || 0,
+          sector,
           high: high || 0,
           low: low || 0,
           open: open || 0,
@@ -91,16 +97,15 @@ export async function GET() {
       } catch (error) {
         console.error(`Error fetching ${symbol}:`, error);
         // Return fallback data if API fails for this symbol
-        const metadata = STOCK_METADATA[symbol];
         return {
           symbol,
-          name: metadata?.name || symbol,
+          name: symbol,
           price: 0,
           change: 0,
           changePercent: 0,
           volume: 0,
           marketCap: 0,
-          sector: metadata?.sector || 'Unknown',
+          sector: 'Unknown',
           high: 0,
           low: 0,
           open: 0,
@@ -108,7 +113,7 @@ export async function GET() {
       }
     });
 
-    const stocks = await Promise.all(quotePromises);
+    const stocks = await Promise.all(stockPromises);
 
     // Cache the results
     cache.set(cacheKey, { data: stocks, timestamp: Date.now() });

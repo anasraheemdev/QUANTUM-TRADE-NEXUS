@@ -7,20 +7,6 @@ const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY || process.env.NEXT_PUBLIC_F
 const cache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_DURATION = 30000; // 30 seconds cache
 
-// Stock metadata
-const STOCK_METADATA: Record<string, { name: string; sector: string }> = {
-  AAPL: { name: 'Apple Inc.', sector: 'Technology' },
-  MSFT: { name: 'Microsoft Corporation', sector: 'Technology' },
-  GOOGL: { name: 'Alphabet Inc.', sector: 'Technology' },
-  AMZN: { name: 'Amazon.com Inc.', sector: 'Consumer Cyclical' },
-  TSLA: { name: 'Tesla, Inc.', sector: 'Consumer Cyclical' },
-  META: { name: 'Meta Platforms Inc.', sector: 'Technology' },
-  NVDA: { name: 'NVIDIA Corporation', sector: 'Technology' },
-  JPM: { name: 'JPMorgan Chase & Co.', sector: 'Financial Services' },
-  V: { name: 'Visa Inc.', sector: 'Financial Services' },
-  JNJ: { name: 'Johnson & Johnson', sector: 'Healthcare' },
-};
-
 // Portfolio positions (shares and average prices)
 const PORTFOLIO_POSITIONS = [
   { symbol: 'AAPL', shares: 50, avgPrice: 170.00 },
@@ -37,6 +23,19 @@ const WATCHLIST = ['AMZN', 'JPM', 'V', 'JNJ'];
 function quotePromise(client: any, symbol: string): Promise<any> {
   return new Promise((resolve, reject) => {
     client.quote(symbol, (error: any, data: any, response: any) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(data);
+      }
+    });
+  });
+}
+
+// Helper function to fetch company profile
+function companyProfilePromise(client: any, symbol: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    client.companyProfile({ symbol }, (error: any, data: any, response: any) => {
       if (error) {
         reject(error);
       } else {
@@ -65,17 +64,22 @@ export async function GET() {
     // Initialize Finnhub client
     const finnhubClient = new finnhub.DefaultApi(FINNHUB_API_KEY);
 
-    // Fetch current prices for all positions in parallel
-    const quotePromises = PORTFOLIO_POSITIONS.map(async (position) => {
+    // Fetch current prices and profiles for all positions in parallel
+    const positionPromises = PORTFOLIO_POSITIONS.map(async (position) => {
       try {
-        const quote = await quotePromise(finnhubClient, position.symbol);
+        // Fetch both quote and profile in parallel
+        const [quote, profile] = await Promise.all([
+          quotePromise(finnhubClient, position.symbol).catch(() => null),
+          companyProfilePromise(finnhubClient, position.symbol).catch(() => null),
+        ]);
 
         // Check if API returned an error
         if (!quote || !quote.c) {
           throw new Error('Invalid quote data');
         }
 
-        const metadata = STOCK_METADATA[position.symbol];
+        // Extract name from profile API response
+        const name = profile?.name || position.symbol;
         const currentPrice = parseFloat(quote.c.toString());
         const totalCost = position.shares * position.avgPrice;
         const currentValue = position.shares * currentPrice;
@@ -84,7 +88,7 @@ export async function GET() {
 
         return {
           symbol: position.symbol,
-          name: metadata?.name || position.symbol,
+          name,
           shares: position.shares,
           avgPrice: position.avgPrice,
           currentPrice: currentPrice > 0 ? currentPrice : position.avgPrice,
@@ -96,11 +100,10 @@ export async function GET() {
       } catch (error) {
         console.error(`Error fetching ${position.symbol}:`, error);
         // Return position with fallback data
-        const metadata = STOCK_METADATA[position.symbol];
         const totalCost = position.shares * position.avgPrice;
         return {
           symbol: position.symbol,
-          name: metadata?.name || position.symbol,
+          name: position.symbol,
           shares: position.shares,
           avgPrice: position.avgPrice,
           currentPrice: position.avgPrice,
@@ -112,7 +115,7 @@ export async function GET() {
       }
     });
 
-    const positions = await Promise.all(quotePromises);
+    const positions = await Promise.all(positionPromises);
 
     // Calculate totals
     const totalValue = positions.reduce((sum, pos) => sum + pos.currentValue, 0);

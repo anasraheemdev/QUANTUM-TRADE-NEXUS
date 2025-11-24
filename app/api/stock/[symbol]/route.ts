@@ -7,24 +7,23 @@ const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY || process.env.NEXT_PUBLIC_F
 const cache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_DURATION = 30000; // 30 seconds cache
 
-// Stock metadata
-const STOCK_METADATA: Record<string, { name: string; sector: string }> = {
-  AAPL: { name: 'Apple Inc.', sector: 'Technology' },
-  MSFT: { name: 'Microsoft Corporation', sector: 'Technology' },
-  GOOGL: { name: 'Alphabet Inc.', sector: 'Technology' },
-  AMZN: { name: 'Amazon.com Inc.', sector: 'Consumer Cyclical' },
-  TSLA: { name: 'Tesla, Inc.', sector: 'Consumer Cyclical' },
-  META: { name: 'Meta Platforms Inc.', sector: 'Technology' },
-  NVDA: { name: 'NVIDIA Corporation', sector: 'Technology' },
-  JPM: { name: 'JPMorgan Chase & Co.', sector: 'Financial Services' },
-  V: { name: 'Visa Inc.', sector: 'Financial Services' },
-  JNJ: { name: 'Johnson & Johnson', sector: 'Healthcare' },
-};
-
 // Helper function to wrap callback-based API calls in promises
 function quotePromise(client: any, symbol: string): Promise<any> {
   return new Promise((resolve, reject) => {
     client.quote(symbol, (error: any, data: any, response: any) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(data);
+      }
+    });
+  });
+}
+
+// Helper function to fetch company profile
+function companyProfilePromise(client: any, symbol: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    client.companyProfile({ symbol }, (error: any, data: any, response: any) => {
       if (error) {
         reject(error);
       } else {
@@ -58,15 +57,22 @@ export async function GET(
     // Initialize Finnhub client
     const finnhubClient = new finnhub.DefaultApi(FINNHUB_API_KEY);
 
-    // Fetch real-time quote from Finnhub
-    const quote = await quotePromise(finnhubClient, symbol.toUpperCase());
+    const symbolUpper = symbol.toUpperCase();
+
+    // Fetch both quote and profile in parallel
+    const [quote, profile] = await Promise.all([
+      quotePromise(finnhubClient, symbolUpper).catch(() => null),
+      companyProfilePromise(finnhubClient, symbolUpper).catch(() => null),
+    ]);
 
     // Check if API returned an error
     if (!quote || !quote.c) {
       throw new Error('Invalid quote data');
     }
 
-    const metadata = STOCK_METADATA[symbol.toUpperCase()];
+    // Extract metadata from profile API response
+    const name = profile?.name || symbolUpper;
+    const sector = profile?.finnhubIndustry || profile?.gicsSector || 'Unknown';
 
     // Finnhub returns: { c: current, h: high, l: low, o: open, pc: previous_close, t: timestamp }
     const price = parseFloat(quote.c.toString());
@@ -78,14 +84,14 @@ export async function GET(
     const open = parseFloat(quote.o?.toString() || '0');
 
     const stock = {
-      symbol: symbol.toUpperCase(),
-      name: metadata?.name || symbol,
+      symbol: symbolUpper,
+      name,
       price: price > 0 ? price : 0,
       change: price > 0 ? change : 0,
       changePercent: price > 0 ? changePercent : 0,
       volume: 0, // Finnhub quote doesn't include volume
-      marketCap: 0, // Need separate API call for market cap
-      sector: metadata?.sector || 'Unknown',
+      marketCap: profile?.marketCapitalization || 0,
+      sector,
       high: high || 0,
       low: low || 0,
       open: open || 0,

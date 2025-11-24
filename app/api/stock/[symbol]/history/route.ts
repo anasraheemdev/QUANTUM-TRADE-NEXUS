@@ -7,24 +7,23 @@ const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY || process.env.NEXT_PUBLIC_F
 const cache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_DURATION = 60000; // 60 seconds cache for history
 
-// Stock metadata
-const STOCK_METADATA: Record<string, { name: string; sector: string }> = {
-  AAPL: { name: 'Apple Inc.', sector: 'Technology' },
-  MSFT: { name: 'Microsoft Corporation', sector: 'Technology' },
-  GOOGL: { name: 'Alphabet Inc.', sector: 'Technology' },
-  AMZN: { name: 'Amazon.com Inc.', sector: 'Consumer Cyclical' },
-  TSLA: { name: 'Tesla, Inc.', sector: 'Consumer Cyclical' },
-  META: { name: 'Meta Platforms Inc.', sector: 'Technology' },
-  NVDA: { name: 'NVIDIA Corporation', sector: 'Technology' },
-  JPM: { name: 'JPMorgan Chase & Co.', sector: 'Financial Services' },
-  V: { name: 'Visa Inc.', sector: 'Financial Services' },
-  JNJ: { name: 'Johnson & Johnson', sector: 'Healthcare' },
-};
-
 // Helper function to wrap callback-based API calls in promises
 function stockCandlesPromise(client: any, symbol: string, resolution: string, from: number, to: number): Promise<any> {
   return new Promise((resolve, reject) => {
     client.stockCandles(symbol, resolution, from, to, (error: any, data: any, response: any) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(data);
+      }
+    });
+  });
+}
+
+// Helper function to fetch company profile
+function companyProfilePromise(client: any, symbol: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    client.companyProfile({ symbol }, (error: any, data: any, response: any) => {
       if (error) {
         reject(error);
       } else {
@@ -79,15 +78,21 @@ export async function GET(
     // Initialize Finnhub client
     const finnhubClient = new finnhub.DefaultApi(FINNHUB_API_KEY);
 
-    // Fetch time series data from Finnhub
-    const data = await stockCandlesPromise(finnhubClient, symbol.toUpperCase(), resolution, from, to);
+    const symbolUpper = symbol.toUpperCase();
+
+    // Fetch both candle data and profile in parallel
+    const [data, profile] = await Promise.all([
+      stockCandlesPromise(finnhubClient, symbolUpper, resolution, from, to).catch(() => null),
+      companyProfilePromise(finnhubClient, symbolUpper).catch(() => null),
+    ]);
 
     // Check if API returned an error
-    if (data.s === 'no_data' || data.s === 'error' || !data.c || data.c.length === 0) {
+    if (!data || data.s === 'no_data' || data.s === 'error' || !data.c || data.c.length === 0) {
       throw new Error('No data available');
     }
 
-    const metadata = STOCK_METADATA[symbol.toUpperCase()];
+    // Extract name from profile API response
+    const name = profile?.name || symbolUpper;
     
     // Finnhub candle data: { c: [close prices], h: [high prices], l: [low prices], o: [open prices], t: [timestamps], v: [volumes], s: status }
     const closes = data.c || [];
@@ -114,8 +119,8 @@ export async function GET(
     }));
 
     const history = {
-      symbol: symbol.toUpperCase(),
-      name: metadata?.name || symbol,
+      symbol: symbolUpper,
+      name,
       lineData,
       candleData,
     };

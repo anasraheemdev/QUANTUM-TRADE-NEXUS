@@ -27,31 +27,84 @@ type ChartType = "line" | "candlestick" | "volume";
 export default function StockChart({ history }: StockChartProps) {
   const [chartType, setChartType] = useState<ChartType>("line");
 
-  // Format data for charts
-  const lineData = history.lineData.map((item) => ({
-    date: new Date(item.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    price: item.price,
-  }));
+  // Validate and format data for charts
+  if (!history || !history.lineData || !history.candleData) {
+    return (
+      <div className="rounded-lg border border-dark-border bg-dark-card p-6">
+        <p className="text-red-400">No chart data available</p>
+      </div>
+    );
+  }
 
-  const candleData = history.candleData.map((item) => {
-    const isUp = item.close >= item.open;
-    return {
-      date: new Date(item.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      open: item.open,
-      high: item.high,
-      low: item.low,
-      close: item.close,
-      bodyTop: Math.max(item.open, item.close),
-      bodyBottom: Math.min(item.open, item.close),
-      bodyHeight: Math.abs(item.close - item.open),
-      isUp,
-    };
-  });
+  // Format data for charts with error handling
+  const lineData = (history.lineData || []).map((item) => {
+    try {
+      const date = item.date ? new Date(item.date) : new Date();
+      return {
+        date: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        price: Number(item.price) || 0,
+      };
+    } catch (error) {
+      return {
+        date: "Invalid",
+        price: 0,
+      };
+    }
+  }).filter(item => item.price > 0);
 
-  const volumeData = history.candleData.map((item) => ({
-    date: new Date(item.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    volume: item.volume / 1000000, // Convert to millions
-  }));
+  const candleData = (history.candleData || []).map((item) => {
+    try {
+      const date = item.date ? new Date(item.date) : new Date();
+      const isUp = (item.close || 0) >= (item.open || 0);
+      return {
+        date: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        open: Number(item.open) || 0,
+        high: Number(item.high) || 0,
+        low: Number(item.low) || 0,
+        close: Number(item.close) || 0,
+        bodyTop: Math.max(item.open || 0, item.close || 0),
+        bodyBottom: Math.min(item.open || 0, item.close || 0),
+        bodyHeight: Math.abs((item.close || 0) - (item.open || 0)),
+        isUp,
+      };
+    } catch (error) {
+      return {
+        date: "Invalid",
+        open: 0,
+        high: 0,
+        low: 0,
+        close: 0,
+        bodyTop: 0,
+        bodyBottom: 0,
+        bodyHeight: 0,
+        isUp: false,
+      };
+    }
+  }).filter(item => item.close > 0);
+
+  const volumeData = (history.candleData || []).map((item) => {
+    try {
+      const date = item.date ? new Date(item.date) : new Date();
+      return {
+        date: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        volume: (Number(item.volume) || 0) / 1000000, // Convert to millions
+      };
+    } catch (error) {
+      return {
+        date: "Invalid",
+        volume: 0,
+      };
+    }
+  }).filter(item => item.volume > 0);
+
+  // Show message if no valid data
+  if (lineData.length === 0 && candleData.length === 0) {
+    return (
+      <div className="rounded-lg border border-dark-border bg-dark-card p-6">
+        <p className="text-red-400">No valid chart data available</p>
+      </div>
+    );
+  }
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -91,7 +144,7 @@ export default function StockChart({ history }: StockChartProps) {
       {/* Chart Container */}
       <div className="h-96">
         <ResponsiveContainer width="100%" height="100%">
-          {chartType === "line" && (
+          {chartType === "line" ? (
             <LineChart data={lineData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1a2332" />
               <XAxis
@@ -115,9 +168,7 @@ export default function StockChart({ history }: StockChartProps) {
                 activeDot={{ r: 6, fill: "#60a5fa" }}
               />
             </LineChart>
-          )}
-
-          {chartType === "candlestick" && (
+          ) : chartType === "candlestick" ? (
             <ComposedChart data={candleData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1a2332" />
               <XAxis
@@ -185,9 +236,7 @@ export default function StockChart({ history }: StockChartProps) {
                 connectNulls
               />
             </ComposedChart>
-          )}
-
-          {chartType === "volume" && (
+          ) : (
             <BarChart data={volumeData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1a2332" />
               <XAxis
