@@ -82,14 +82,29 @@ function UserProfileContent() {
     // Refresh user data when page becomes visible (after transfer)
     const handleVisibilityChange = () => {
       if (!document.hidden && authUser && session) {
-        fetchUserProfile();
+        setTimeout(() => {
+          fetchUserProfile();
+        }, 500);
+      }
+    };
+    
+    // Listen for balance update events
+    const handleBalanceUpdate = () => {
+      if (authUser && session) {
+        setTimeout(() => {
+          fetchUserProfile();
+        }, 500);
       }
     };
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('balanceUpdated', handleBalanceUpdate);
+    window.addEventListener('storage', handleBalanceUpdate);
     
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('balanceUpdated', handleBalanceUpdate);
+      window.removeEventListener('storage', handleBalanceUpdate);
     };
   }, [userId, authUser, session, authLoading, router]);
 

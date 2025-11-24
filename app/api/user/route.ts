@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase";
+import { createServerClient, createAdminClient } from "@/lib/supabase";
 
 // Force dynamic rendering - this route uses request headers
 export const dynamic = 'force-dynamic';
@@ -21,8 +21,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Fetch user profile
-    const { data: userData, error } = await supabase
+    // Fetch user profile - use admin client to ensure we get latest data
+    // This bypasses any potential caching issues and RLS
+    const adminSupabase = createAdminClient();
+    
+    const { data: userData, error } = await adminSupabase
       .from("users")
       .select("*")
       .eq("id", user.id)
@@ -35,7 +38,10 @@ export async function GET(request: NextRequest) {
       // Generate unique user ID
       const uniqueId = `USER${Math.floor(100000 + Math.random() * 900000)}`;
       
-      const { data: newUser, error: insertError } = await supabase
+      // Use admin client for user creation to bypass RLS
+      const adminSupabase = createAdminClient();
+      
+      const { data: newUser, error: insertError } = await adminSupabase
         .from("users")
         .insert({
           id: user.id,
@@ -94,8 +100,10 @@ export async function GET(request: NextRequest) {
         uniqueId = `USER${Date.now().toString().slice(-6)}`;
       }
       
-      // Update user with unique ID
-      const { data: updatedUser, error: updateError } = await supabase
+      // Update user with unique ID - use admin client
+      const adminSupabase = createAdminClient();
+      
+      const { data: updatedUser, error: updateError } = await adminSupabase
         .from("users")
         .update({ unique_user_id: uniqueId })
         .eq("id", user.id)

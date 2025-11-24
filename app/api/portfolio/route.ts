@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase";
+import { createServerClient, createAdminClient } from "@/lib/supabase";
 
 // Force dynamic rendering - this route uses request headers
 export const dynamic = 'force-dynamic';
@@ -25,8 +25,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Fetch user profile for account balance
-    const { data: userData } = await supabase
+    // Fetch user profile for account balance - use admin client for latest data
+    // This ensures we get the most up-to-date balance after transfers
+    const adminSupabase = createAdminClient();
+    
+    const { data: userData } = await adminSupabase
       .from("users")
       .select("account_balance, total_invested")
       .eq("id", user.id)

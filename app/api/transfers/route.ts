@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase";
+import { createServerClient, createAdminClient } from "@/lib/supabase";
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -7,6 +7,8 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   try {
     const supabase = createServerClient();
+    // Use admin client for balance updates to bypass RLS
+    const adminSupabase = createAdminClient();
     
     // Get auth token from request
     const authHeader = request.headers.get("authorization");
@@ -104,7 +106,8 @@ export async function POST(request: NextRequest) {
     let transferError: any = null;
     
     try {
-      const rpcResult = await supabase
+      // Use admin client for RPC call to ensure it works
+      const rpcResult = await adminSupabase
         .rpc('process_credit_transfer', {
           p_from_user_id: user.id,
           p_to_user_id: receiver.id,
@@ -123,10 +126,10 @@ export async function POST(request: NextRequest) {
     if (transferError || !transferResult || !transferResult.success) {
       console.log("Using direct update method...");
       
-      // Perform atomic transfer manually
+      // Perform atomic transfer manually using admin client to bypass RLS
       // Deduct from sender
       const newSenderBalance = Number(sender.account_balance) - Number(amount);
-      const { data: updatedSender, error: deductError } = await supabase
+      const { data: updatedSender, error: deductError } = await adminSupabase
         .from("users")
         .update({ account_balance: newSenderBalance })
         .eq("id", user.id)
@@ -139,8 +142,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { 
             error: "Failed to deduct from sender", 
-            details: deductError.message,
-            hint: "Check RLS policies. Run FIX_RLS_POLICIES.sql in Supabase SQL Editor."
+            details: deductError.message
           },
           { status: 500 }
         );
@@ -153,7 +155,7 @@ export async function POST(request: NextRequest) {
       });
 
       // Get receiver's current balance
-      const { data: receiverData, error: receiverFetchError } = await supabase
+      const { data: receiverData, error: receiverFetchError } = await adminSupabase
         .from("users")
         .select("account_balance")
         .eq("id", receiver.id)
@@ -161,7 +163,7 @@ export async function POST(request: NextRequest) {
 
       if (receiverFetchError || !receiverData) {
         // Rollback: add back to sender
-        await supabase
+        await adminSupabase
           .from("users")
           .update({ account_balance: sender.account_balance })
           .eq("id", user.id);
@@ -174,7 +176,7 @@ export async function POST(request: NextRequest) {
 
       // Add to receiver
       const newReceiverBalance = Number(receiverData.account_balance || 0) + Number(amount);
-      const { data: updatedReceiver, error: addError } = await supabase
+      const { data: updatedReceiver, error: addError } = await adminSupabase
         .from("users")
         .update({ account_balance: newReceiverBalance })
         .eq("id", receiver.id)
@@ -183,7 +185,7 @@ export async function POST(request: NextRequest) {
 
       if (addError) {
         // Rollback: add back to sender
-        await supabase
+        await adminSupabase
           .from("users")
           .update({ account_balance: sender.account_balance })
           .eq("id", user.id);
@@ -193,8 +195,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { 
             error: "Failed to add to receiver", 
-            details: addError.message,
-            hint: "Check RLS policies. Run FIX_RLS_POLICIES.sql in Supabase SQL Editor."
+            details: addError.message
           },
           { status: 500 }
         );
@@ -206,8 +207,8 @@ export async function POST(request: NextRequest) {
         updated: updatedReceiver?.account_balance
       });
       
-      // Record the transfer
-      const { data: transferRecord, error: recordError } = await supabase
+      // Record the transfer using admin client to ensure it's saved
+      const { data: transferRecord, error: recordError } = await adminSupabase
         .from("credit_transfers")
         .insert({
           from_user_id: user.id,

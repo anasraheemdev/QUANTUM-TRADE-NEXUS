@@ -70,12 +70,22 @@ export default function TransferModal({
 
       setSuccess(true);
       
+      // Trigger balance update event for other components
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('balanceUpdated'));
+        // Also update localStorage to trigger storage event
+        localStorage.setItem('balanceUpdate', Date.now().toString());
+      }
+      
       // Close modal and trigger refresh
       setTimeout(() => {
         onSuccess();
-        // Use router refresh instead of full reload for better UX
+        // Force a hard refresh to ensure balances update
         if (typeof window !== 'undefined') {
-          window.location.reload();
+          // Small delay to ensure backend has fully processed
+          setTimeout(() => {
+            window.location.reload();
+          }, 500);
         }
       }, 1500);
     } catch (err) {

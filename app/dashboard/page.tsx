@@ -116,6 +116,31 @@ export default function DashboardPage() {
     };
 
     fetchData();
+    
+    // Listen for balance update events
+    const handleBalanceUpdate = () => {
+      if (user && session) {
+        setTimeout(() => {
+          fetchData();
+        }, 500);
+      }
+    };
+    
+    // Poll for balance updates every 5 seconds
+    const pollInterval = setInterval(() => {
+      if (user && session && !document.hidden) {
+        fetchData();
+      }
+    }, 5000);
+    
+    window.addEventListener('balanceUpdated', handleBalanceUpdate);
+    window.addEventListener('storage', handleBalanceUpdate);
+    
+    return () => {
+      clearInterval(pollInterval);
+      window.removeEventListener('balanceUpdated', handleBalanceUpdate);
+      window.removeEventListener('storage', handleBalanceUpdate);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, session, authLoading]);
 

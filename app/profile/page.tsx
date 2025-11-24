@@ -185,14 +185,37 @@ export default function ProfilePage() {
     // Refresh user data when page becomes visible (after transfer)
     const handleVisibilityChange = () => {
       if (!document.hidden && authUser && session) {
+        // Add small delay to ensure backend has processed
+        setTimeout(() => {
+          fetchUserProfile();
+        }, 500);
+      }
+    };
+    
+    // Also listen for storage events (when balance updates from other tabs)
+    const handleStorageChange = () => {
+      if (authUser && session) {
         fetchUserProfile();
       }
     };
     
+    // Poll for balance updates every 5 seconds (in case of transfers)
+    const pollInterval = setInterval(() => {
+      if (authUser && session && !document.hidden) {
+        fetchUserProfile();
+      }
+    }, 5000);
+    
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('storage', handleStorageChange);
+    // Listen for custom refresh event
+    window.addEventListener('balanceUpdated', fetchUserProfile);
     
     return () => {
+      clearInterval(pollInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('balanceUpdated', fetchUserProfile);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authUser, session, authLoading]);
