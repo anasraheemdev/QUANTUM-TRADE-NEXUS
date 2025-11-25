@@ -13,6 +13,9 @@ import {
   Settings,
   X,
   LogOut,
+  Shield,
+  Users,
+  History,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -27,10 +30,17 @@ const publicMenuItems = [
 const protectedMenuItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard", requiresAuth: true },
   { icon: Wallet, label: "Portfolio", href: "/dashboard", requiresAuth: true },
+  { icon: History, label: "Trade History", href: "/transactions", requiresAuth: true },
   { icon: BarChart3, label: "Analytics", href: "/dashboard", requiresAuth: true },
   { icon: User, label: "Profile", href: "/profile", requiresAuth: true },
   { icon: User, label: "Find Users", href: "/users", requiresAuth: true },
   { icon: Settings, label: "Settings", href: "/profile", requiresAuth: true },
+];
+
+// Admin menu items (only visible to admins)
+const adminMenuItems = [
+  { icon: Shield, label: "Admin Portal", href: "/admin", requiresAuth: true, adminOnly: true },
+  { icon: Users, label: "Client Management", href: "/admin/clients", requiresAuth: true, adminOnly: true },
 ];
 
 interface SidebarProps {
@@ -41,16 +51,39 @@ interface SidebarProps {
 export default function Sidebar({ isOpen: controlledIsOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, signOut, loading: authLoading } = useAuth();
+  const { user, session, signOut, loading: authLoading } = useAuth();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   
   const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : isMobileOpen;
   const setIsOpen = onClose ? onClose : setIsMobileOpen;
 
-  // Get menu items based on auth status
+  // Check if user is admin
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (session) {
+        try {
+          const response = await fetch("/api/admin/check", {
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          });
+          const data = await response.json();
+          setIsAdmin(data.isAdmin || false);
+        } catch (error) {
+          console.error("Error checking admin status:", error);
+          setIsAdmin(false);
+        }
+      }
+    };
+    checkAdmin();
+  }, [session]);
+
+  // Get menu items based on auth status and admin role
   const menuItems = [
     ...publicMenuItems,
     ...(user ? protectedMenuItems : []),
+    ...(user && isAdmin ? adminMenuItems : []),
   ];
 
   // Close sidebar when route changes on mobile
@@ -84,10 +117,12 @@ export default function Sidebar({ isOpen: controlledIsOpen, onClose }: SidebarPr
         {menuItems.map((item, index) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
+          // Use a unique key combining href and label to avoid duplicate key warnings
+          const uniqueKey = `${item.href}-${item.label}-${index}`;
           
           return (
             <motion.div
-              key={item.href}
+              key={uniqueKey}
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: index * 0.05 }}

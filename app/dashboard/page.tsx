@@ -15,6 +15,7 @@ import { Stock, Portfolio } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import Loading from "@/components/Loading";
+import Link from "next/link";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -36,12 +37,29 @@ export default function DashboardPage() {
       return;
     }
     
+    // Check if user is admin and redirect to admin dashboard
+    const checkAdminAndRedirect = async () => {
+      if (session) {
+        try {
+          const response = await fetch("/api/admin/check", {
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          });
+          const data = await response.json();
+          if (data.isAdmin) {
+            router.replace("/admin");
+            return;
+          }
+        } catch (error) {
+          console.error("Error checking admin status:", error);
+        }
+      }
+    };
+    
+    checkAdminAndRedirect();
+    
     // User exists, proceed with data fetching
-    if (!user) {
-      return;
-    }
-
-    // Only fetch if we have a user
     if (!user) {
       return;
     }
@@ -181,10 +199,27 @@ export default function DashboardPage() {
               animate={{ opacity: 1, y: 0 }}
               className="mb-6 sm:mb-8"
             >
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">Dashboard</h1>
-              <p className="text-blue-accent/70 text-sm sm:text-base lg:text-lg">
-                Overview of your portfolio and market activity
-              </p>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">My Portfolio</h1>
+                  <p className="text-blue-accent/70 text-sm sm:text-base lg:text-lg">
+                    View your investments and market activity
+                  </p>
+                </div>
+                <div className="hidden sm:block">
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg px-4 py-2">
+                    <p className="text-xs text-blue-400">
+                      <span className="font-semibold">Note:</span> Trading is managed by administrators
+                    </p>
+                  </div>
+                </div>
+              </div>
+              {/* Mobile notice */}
+              <div className="sm:hidden bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mt-4">
+                <p className="text-xs text-blue-400">
+                  <span className="font-semibold">Note:</span> Trading is managed by administrators
+                </p>
+              </div>
             </motion.div>
 
             {/* Portfolio Summary */}
@@ -194,7 +229,15 @@ export default function DashboardPage() {
 
             {/* Portfolio Positions */}
             <div className="mb-6 sm:mb-8">
-              <h2 className="text-xl sm:text-2xl font-bold text-blue-accent mb-4 sm:mb-6">Your Positions</h2>
+              <div className="flex items-center justify-between mb-4 sm:mb-6">
+                <h2 className="text-xl sm:text-2xl font-bold text-blue-accent">Your Positions</h2>
+                <Link
+                  href="/transactions"
+                  className="text-sm text-blue-primary hover:text-blue-accent transition-colors"
+                >
+                  View Trade History →
+                </Link>
+              </div>
               <div className="rounded-lg border border-dark-border bg-dark-card overflow-hidden">
                 <div className="overflow-x-auto scrollbar-hide">
                   <table className="w-full min-w-[600px]">

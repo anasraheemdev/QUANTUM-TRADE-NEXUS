@@ -49,8 +49,19 @@ export default function MarketsPage() {
                 transition={{ delay: 0.1 }}
                 className="text-blue-accent/70 text-sm sm:text-base lg:text-lg"
               >
-                Explore real-time stock market data and trading opportunities
+                Explore real-time stock market data and view your portfolio
               </motion.p>
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="mt-4 bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 max-w-2xl"
+              >
+                <p className="text-xs sm:text-sm text-blue-400">
+                  <span className="font-semibold">Note:</span> Stock trading is managed by administrators. 
+                  Contact your administrator to execute trades on your behalf.
+                </p>
+              </motion.div>
             </div>
 
             {/* Market Movers */}

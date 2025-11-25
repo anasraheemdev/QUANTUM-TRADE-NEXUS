@@ -6,10 +6,10 @@ import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
 import StockChart from "@/components/StockChart";
-import BuySellModal from "@/components/BuySellModal";
+// Trading removed - only admins can trade
 import { Stock, StockHistory } from "@/lib/types";
 import { formatCurrency, formatPercent, formatLargeNumber } from "@/lib/utils";
-import { TrendingUp, TrendingDown, ShoppingCart, ArrowLeft } from "lucide-react";
+import { TrendingUp, TrendingDown, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import Loading from "@/components/Loading";
 
@@ -20,8 +20,7 @@ export default function StockDetailsPage() {
 
   const [stock, setStock] = useState<Stock | null>(null);
   const [history, setHistory] = useState<StockHistory | null>(null);
-  const [isBuyModalOpen, setIsBuyModalOpen] = useState(false);
-  const [isSellModalOpen, setIsSellModalOpen] = useState(false);
+  // Trading modals removed - only admins can trade
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -190,22 +189,7 @@ export default function StockDetailsPage() {
                   <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">{stock.symbol}</h1>
                   <p className="text-sm sm:text-base lg:text-lg text-blue-accent/70">{stock.name}</p>
                 </div>
-                <div className="flex items-center gap-2 sm:gap-4">
-                  <button
-                    onClick={() => setIsBuyModalOpen(true)}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm sm:text-base font-semibold transition-all shadow-lg shadow-green-500/50"
-                  >
-                    <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
-                    <span className="hidden xs:inline">Buy</span>
-                  </button>
-                  <button
-                    onClick={() => setIsSellModalOpen(true)}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm sm:text-base font-semibold transition-all shadow-lg shadow-red-500/50"
-                  >
-                    <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
-                    <span className="hidden xs:inline">Sell</span>
-                  </button>
-                </div>
+                {/* Trading buttons removed - only admins can execute trades */}
               </div>
             </motion.div>
 
@@ -330,19 +314,7 @@ export default function StockDetailsPage() {
         </main>
       </div>
 
-      {/* Modals */}
-      <BuySellModal
-        isOpen={isBuyModalOpen}
-        onClose={() => setIsBuyModalOpen(false)}
-        stock={stock}
-        type="buy"
-      />
-      <BuySellModal
-        isOpen={isSellModalOpen}
-        onClose={() => setIsSellModalOpen(false)}
-        stock={stock}
-        type="sell"
-      />
+      {/* Trading modals removed - only admins can execute trades */}
     </div>
   );
 }

@@ -41,6 +41,7 @@ export interface User {
   totalInvested: number;
   memberSince: string;
   tradingLevel: string;
+  role?: 'admin' | 'client';
   preferences: {
     theme: string;
     notifications: boolean;
@@ -56,6 +57,19 @@ export interface User {
       date: string;
     };
   };
+}
+
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  avatar_url: string | null;
+  account_balance: number;
+  total_invested: number;
+  member_since: string;
+  trading_level: string;
+  unique_user_id?: string;
+  role: 'admin' | 'client';
 }
 
 export interface StockHistory {
@@ -75,4 +89,37 @@ export interface StockHistory {
   }>;
 }
 
+export interface PublicUserProfile {
+  id: string;
+  email: string;
+  name: string;
+  trading_level: string;
+  member_since: string;
+  avatar_url: string | null;
+  total_invested: number;
+  unique_user_id?: string;
+}
 
+export interface Notification {
+  id: string;
+  type: 'credit_transfer';
+  message: string;
+  from_user_name?: string;
+  to_user_name?: string;
+  from_unique_id?: string;
+  to_unique_id?: string;
+  amount: number;
+  created_at: string;
+  is_read: boolean;
+}
+
+export interface AdminClient {
+  id: string;
+  name: string;
+  email: string;
+  account_balance: number;
+  total_invested: number;
+  trading_level: string;
+  member_since: string;
+  unique_user_id?: string;
+}

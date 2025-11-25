@@ -36,8 +36,8 @@ export async function GET(request: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    // Fetch portfolio positions
-    const { data: positions, error: positionsError } = await supabase
+    // Fetch portfolio positions - use admin client to bypass RLS if available
+    const { data: positions, error: positionsError } = await clientToUse
       .from("portfolio_positions")
       .select("*")
       .eq("user_id", user.id);

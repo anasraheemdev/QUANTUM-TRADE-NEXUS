@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
         trading_level: "Beginner",
         member_since: new Date().toISOString(),
         unique_user_id: uniqueId,
+        role: 'client', // Explicitly set role to 'client' for new users
       })
       .select()
       .single();

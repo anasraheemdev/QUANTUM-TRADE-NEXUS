@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase";
+import { createServerClient, tryCreateAdminClient } from "@/lib/supabase";
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -21,6 +21,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Use admin client to bypass RLS for searching all users
+    const adminClient = tryCreateAdminClient();
+    const clientToUse = adminClient || supabase;
+
     // Get search query from URL params
     const searchParams = request.nextUrl.searchParams;
     const query = searchParams.get("q");
@@ -30,13 +34,18 @@ export async function GET(request: NextRequest) {
     }
 
     const searchTerm = query.trim();
+    console.log('User search query:', searchTerm, 'Using admin client:', !!adminClient);
 
     // Search by name (case-insensitive, partial match)
-    const { data: usersByName, error: nameError } = await supabase
+    const { data: usersByName, error: nameError } = await clientToUse
       .from("users")
       .select("id, email, name, account_balance, total_invested, trading_level, member_since, avatar_url, unique_user_id")
       .ilike("name", `%${searchTerm}%`)
       .limit(20);
+
+    if (nameError) {
+      console.error("Error searching by name:", nameError);
+    }
 
     // Search by unique_user_id (exact or partial match)
     // Try searching by unique_user_id if the search term contains "USER" or is numeric
@@ -46,7 +55,7 @@ export async function GET(request: NextRequest) {
         ? `%${searchTerm.toUpperCase()}%` 
         : `%USER${searchTerm}%`;
       
-      const { data, error: uniqueIdError } = await supabase
+      const { data, error: uniqueIdError } = await clientToUse
         .from("users")
         .select("id, email, name, account_balance, total_invested, trading_level, member_since, avatar_url, unique_user_id")
         .ilike("unique_user_id", searchPattern)
@@ -54,23 +63,45 @@ export async function GET(request: NextRequest) {
       
       if (!uniqueIdError) {
         usersByUniqueId = data || [];
+      } else {
+        console.error("Error searching by unique_user_id:", uniqueIdError);
       }
     }
 
     // Search by UUID (if it looks like a UUID)
     let usersByUuid: any[] = [];
     if (searchTerm.includes('-') && searchTerm.length >= 30) {
-      const { data, error } = await supabase
+      const { data, error } = await clientToUse
         .from("users")
         .select("id, email, name, account_balance, total_invested, trading_level, member_since, avatar_url, unique_user_id")
         .eq("id", searchTerm)
         .limit(20);
       
-      usersByUuid = data || [];
+      if (!error) {
+        usersByUuid = data || [];
+      } else {
+        console.error("Error searching by UUID:", error);
+      }
+    }
+
+    // Also search by email (partial match)
+    const { data: usersByEmail, error: emailError } = await clientToUse
+      .from("users")
+      .select("id, email, name, account_balance, total_invested, trading_level, member_since, avatar_url, unique_user_id")
+      .ilike("email", `%${searchTerm}%`)
+      .limit(20);
+
+    if (emailError) {
+      console.error("Error searching by email:", emailError);
     }
 
     // Combine results and remove duplicates
-    const allUsers = [...(usersByName || []), ...(usersByUniqueId || []), ...usersByUuid];
+    const allUsers = [
+      ...(usersByName || []), 
+      ...(usersByUniqueId || []), 
+      ...usersByUuid,
+      ...(usersByEmail || [])
+    ];
     const uniqueUsers = Array.from(
       new Map(allUsers.map(user => [user.id, user])).values()
     );
@@ -88,6 +119,7 @@ export async function GET(request: NextRequest) {
       total_invested: user.total_invested || 0,
     }));
 
+    console.log('User search results:', sanitizedUsers.length, 'users found');
     return NextResponse.json({
       users: sanitizedUsers,
       count: sanitizedUsers.length

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase";
+import { createServerClient, tryCreateAdminClient } from "@/lib/supabase";
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -7,6 +7,9 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
     const supabase = createServerClient();
+    // Use admin client for user queries to bypass RLS
+    const adminSupabase = tryCreateAdminClient();
+    const clientToUse = adminSupabase || supabase;
     
     // Get auth token from request
     const authHeader = request.headers.get("authorization");
@@ -71,7 +74,7 @@ export async function GET(request: NextRequest) {
           if (t.to_user_id) userIds.add(t.to_user_id);
         });
         
-        const { data: usersData } = await supabase
+        const { data: usersData } = await clientToUse
           .from("users")
           .select("id, name, email, unique_user_id")
           .in("id", Array.from(userIds));

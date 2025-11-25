@@ -292,7 +292,7 @@ export default function ProfilePage() {
                   {user.avatar_url ? (
                     <Image
                       src={user.avatar_url}
-                      alt={user.name}
+                    alt={user.name}
                       width={128}
                       height={128}
                       className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-blue-primary shadow-blue-glow object-cover"
@@ -361,8 +361,8 @@ export default function ProfilePage() {
                         >
                           Cancel
                         </button>
-                      </div>
-                    </div>
+                  </div>
+                </div>
                   ) : (
                     <>
                       <div className="flex items-center justify-between mb-2">
@@ -375,19 +375,19 @@ export default function ProfilePage() {
                         </button>
                       </div>
                       <div className="flex flex-col sm:flex-row flex-wrap items-center sm:items-start justify-center sm:justify-start gap-2 sm:gap-4 text-xs sm:text-sm text-blue-accent/70">
-                        <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                           <Mail className="h-3 w-3 sm:h-4 sm:w-4" />
                           <span className="break-all">{user.email}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
+                    </div>
+                    <div className="flex items-center gap-2">
                           <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
                           <span>Member since {new Date(user.member_since).toLocaleDateString()}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
+                    </div>
+                    <div className="flex items-center gap-2">
                           <Award className="h-3 w-3 sm:h-4 sm:w-4" />
                           <span>{user.trading_level} Trader</span>
-                        </div>
-                      </div>
+                    </div>
+                  </div>
                     </>
                   )}
                 </div>
