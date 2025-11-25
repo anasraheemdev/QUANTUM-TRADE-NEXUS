@@ -152,63 +152,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error('Signup error:', error);
+        
+        // If error is due to trigger failure, try to create user via API route
+        if (error.message?.includes('Database error saving new user')) {
+          console.log('Trigger failed, but user might be created. Checking...');
+          // The user might still be created in auth.users even if trigger fails
+          // We'll handle profile creation via API route after signup
+        }
+        
         return { error };
       }
 
       console.log('Auth signup successful, user:', data.user?.id);
 
-      // If user is created, the database trigger should automatically create the profile
-      // We'll verify it was created, and use API route as fallback if needed
+      // Create user profile via API route (more reliable than trigger)
       if (data.user) {
         console.log('User created:', data.user.id);
-        console.log('Database trigger should create profile automatically');
+        console.log('Creating user profile via API route...');
         
-        // Wait a moment for trigger to execute, then verify
-        setTimeout(async () => {
-          try {
-            // Check if profile was created by trigger
-            if (!data.user) {
-              console.log('No user in data, skipping profile check');
-              return;
-            }
-            
-            const { data: profile, error: checkError } = await supabase
-              .from('users')
-              .select('id')
-              .eq('id', data.user.id)
-              .single();
+        try {
+          // Use API route to create profile (bypasses trigger issues)
+          const response = await fetch('/api/user/create', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              userId: data.user.id,
+              email: data.user.email || email,
+              name: name,
+            }),
+          });
 
-            if (profile) {
-              console.log('✅ User profile created by database trigger');
-            } else if (checkError) {
-              console.log('Profile not found, trying API route as fallback...');
-              
-              // Fallback: Use API route if trigger didn't work
-              const response = await fetch('/api/user/create', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  userId: data.user.id,
-                  email: data.user.email,
-                  name: name,
-                }),
-              });
-
-              const result = await response.json();
-              
-              if (!response.ok) {
-                console.warn('API route also failed:', result.error);
-                console.warn('Profile will be created on first login');
-              } else {
-                console.log('✅ User profile created via API route');
-              }
-            }
-          } catch (error) {
-            console.error('Error checking/creating profile:', error);
+          const result = await response.json();
+          
+          if (!response.ok) {
+            console.warn('API route also failed:', result.error);
+            console.warn('Profile will be created on first login');
+          } else {
+            console.log('✅ User profile created via API route');
           }
-        }, 1000); // Wait 1 second for trigger
+        } catch (profileError) {
+          console.error('Error creating profile via API route:', profileError);
+          // Don't fail signup if profile creation fails - user can still sign in
+        }
 
         // Set session and user if available
         if (data.session) {
