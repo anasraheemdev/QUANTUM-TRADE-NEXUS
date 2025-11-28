@@ -4,8 +4,10 @@ import { isAdmin } from "@/lib/admin";
 import fs from "fs";
 import path from "path";
 
-// Force dynamic rendering
+// Force dynamic rendering - no caching
 export const dynamic = 'force-dynamic';
+export const revalidate = 0; // Disable caching
+export const fetchCache = 'force-no-store'; // Disable fetch caching
 
 export async function GET(
   request: NextRequest,
@@ -43,12 +45,21 @@ export async function GET(
       return NextResponse.json({ error: "Admin client not available" }, { status: 500 });
     }
     
-    // Fetch client user data
+    // Fetch client user data - use admin client to get latest data directly from database
+    // Force a fresh query by selecting specific fields
     const { data: client, error: clientError } = await adminClient
       .from("users")
-      .select("*")
+      .select("id, email, name, avatar_url, account_balance, total_invested, trading_level, member_since, role, unique_user_id, created_at, updated_at")
       .eq("id", clientId)
       .single();
+    
+    console.log("Admin client detail - Fetched client data from DB:", {
+      clientId,
+      balance: client?.account_balance,
+      balanceType: typeof client?.account_balance,
+      balanceRaw: client?.account_balance,
+      timestamp: new Date().toISOString()
+    });
 
     if (clientError) {
       console.error("Error fetching client:", clientError);
@@ -94,15 +105,46 @@ export async function GET(
     }
 
     console.log(`Fetched client ${clientId}: ${enrichedPositions.length} positions, ${transactions?.length || 0} transactions`);
+    
+    // Parse balance correctly - handle both string and number types
+    const parsedBalance = client.account_balance 
+      ? (typeof client.account_balance === 'string' 
+          ? parseFloat(client.account_balance) 
+          : Number(client.account_balance))
+      : 0;
+    
+    const parsedInvested = client.total_invested
+      ? (typeof client.total_invested === 'string'
+          ? parseFloat(client.total_invested)
+          : Number(client.total_invested))
+      : 0;
+    
+    console.log("Balance parsing:", {
+      raw: client.account_balance,
+      type: typeof client.account_balance,
+      parsed: parsedBalance
+    });
 
-    return NextResponse.json({
+    // Ensure we return the actual balance from database (not cached)
+    const responseData = {
       client: {
         ...client,
-        account_balance: parseFloat(client.account_balance) || 0,
-        total_invested: parseFloat(client.total_invested) || 0,
+        account_balance: parsedBalance,
+        total_invested: parsedInvested,
       },
       positions: enrichedPositions,
       transactions: transactions || [],
+    };
+    
+    console.log("Returning response with balance:", responseData.client.account_balance);
+
+    // Add cache-control headers to prevent caching
+    return NextResponse.json(responseData, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
     });
   } catch (error) {
     console.error("Error in admin client detail route:", error);

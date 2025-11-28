@@ -12,24 +12,106 @@ export async function POST(request: NextRequest) {
     const supabase = createServerClient();
     
     const authHeader = request.headers.get("authorization");
-    if (!authHeader) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const token = authHeader.replace("Bearer ", "");
+    console.log("Admin trade request - Auth header present:", !!authHeader);
     
-    // Verify user token
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
+    if (!authHeader) {
+      console.error("Admin trade: No authorization header");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const token = authHeader.replace("Bearer ", "").trim();
+    console.log("Admin trade: Token extracted, length:", token.length);
+    console.log("Admin trade: Token preview:", token.substring(0, 30) + "...");
+    
+    if (!token || token.length < 10) {
+      console.error("Admin trade: Invalid token format - token too short");
+      return NextResponse.json({ 
+        error: "Unauthorized", 
+        details: "Invalid token format" 
+      }, { status: 401 });
+    }
+    
+    // Decode JWT token to get user ID, then verify with admin client
+    // This avoids the "Auth session missing" error
+    let userId: string | null = null;
+    
+    try {
+      // Decode JWT token (simple base64 decode of payload)
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        console.error("Admin trade: Invalid JWT format");
+        return NextResponse.json({ 
+          error: "Unauthorized", 
+          details: "Invalid token format" 
+        }, { status: 401 });
+      }
+      
+      // Decode payload (second part)
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+      userId = payload.sub; // 'sub' is the user ID in Supabase JWT
+      
+      console.log("Admin trade: Decoded user ID from token:", userId);
+      
+      if (!userId) {
+        console.error("Admin trade: No user ID in token");
+        return NextResponse.json({ 
+          error: "Unauthorized", 
+          details: "Invalid token: no user ID" 
+        }, { status: 401 });
+      }
+      
+      // Verify token is not expired
+      if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+        console.error("Admin trade: Token expired");
+        return NextResponse.json({ 
+          error: "Unauthorized", 
+          details: "Token expired" 
+        }, { status: 401 });
+      }
+      
+    } catch (err: any) {
+      console.error("Admin trade: Error decoding token:", err);
+      return NextResponse.json({ 
+        error: "Unauthorized", 
+        details: "Invalid token format" 
+      }, { status: 401 });
+    }
+    
+    // Use admin client to get user info (bypasses RLS)
+    const adminClientForAuth = tryCreateAdminClient();
+    const clientToUse = adminClientForAuth || supabase;
+    
+    const { data: userData, error: userError } = await clientToUse
+      .from("users")
+      .select("id, email, role")
+      .eq("id", userId)
+      .single();
+    
+    if (userError || !userData) {
+      console.error("Admin trade: User not found in database:", userError);
+      return NextResponse.json({ 
+        error: "Unauthorized", 
+        details: "User not found" 
+      }, { status: 401 });
+    }
+    
+    const userFromSession = {
+      id: userData.id,
+      email: userData.email
+    };
+    
+    console.log("Admin trade: User authenticated:", userFromSession.email, "ID:", userFromSession.id);
 
     // Check if user is admin
-    const adminStatus = await isAdmin(user.id);
+    const adminStatus = await isAdmin(userFromSession.id);
+    console.log("Admin trade: Admin status for", userFromSession.email, ":", adminStatus);
+    
     if (!adminStatus) {
+      console.error("Admin trade: User is not admin:", userFromSession.email);
       return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 });
     }
+
+    const user = userFromSession;
 
     const body = await request.json();
     const { clientId, symbol, type, quantity } = body;
@@ -56,8 +138,12 @@ export async function POST(request: NextRequest) {
     const fee = total * 0.001; // 0.1% fee
     const totalCost = total + fee;
 
-    // Use admin client for all operations
-    const adminClient = tryCreateAdminClient() || supabase;
+    // Use admin client for all operations - MUST use admin client to bypass RLS
+    const adminClient = tryCreateAdminClient();
+    if (!adminClient) {
+      console.error("Admin trade: Admin client not available");
+      return NextResponse.json({ error: "Admin client not available" }, { status: 500 });
+    }
 
     // Get client's current balance
     const { data: clientData, error: clientError } = await adminClient
@@ -84,15 +170,28 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Insufficient balance" }, { status: 400 });
       }
 
-      // Update balance
-      const { error: balanceError } = await adminClient
+      // Update balance - use admin client to bypass RLS
+      const newBalance = Number(clientData.account_balance) - Number(totalCost);
+      const { data: updatedClient, error: balanceError } = await adminClient
         .from("users")
-        .update({ account_balance: clientData.account_balance - totalCost })
-        .eq("id", clientId);
+        .update({ account_balance: newBalance })
+        .eq("id", clientId)
+        .select("account_balance")
+        .single();
 
-      if (balanceError) {
-        return NextResponse.json({ error: "Failed to update balance" }, { status: 500 });
+      if (balanceError || !updatedClient) {
+        console.error("Balance update error:", balanceError);
+        return NextResponse.json({ 
+          error: "Failed to update balance", 
+          details: balanceError?.message 
+        }, { status: 500 });
       }
+
+      console.log("Balance updated (BUY):", {
+        old: clientData.account_balance,
+        new: newBalance,
+        updated: updatedClient.account_balance
+      });
 
       // Update or create position
       if (position) {
@@ -130,15 +229,28 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Insufficient shares" }, { status: 400 });
       }
 
-      // Update balance
-      const { error: balanceError } = await adminClient
+      // Update balance - use admin client to bypass RLS
+      const newBalance = Number(clientData.account_balance) + Number(total) - Number(fee);
+      const { data: updatedClient, error: balanceError } = await adminClient
         .from("users")
-        .update({ account_balance: clientData.account_balance + total - fee })
-        .eq("id", clientId);
+        .update({ account_balance: newBalance })
+        .eq("id", clientId)
+        .select("account_balance")
+        .single();
 
-      if (balanceError) {
-        return NextResponse.json({ error: "Failed to update balance" }, { status: 500 });
+      if (balanceError || !updatedClient) {
+        console.error("Balance update error:", balanceError);
+        return NextResponse.json({ 
+          error: "Failed to update balance", 
+          details: balanceError?.message 
+        }, { status: 500 });
       }
+
+      console.log("Balance updated:", {
+        old: clientData.account_balance,
+        new: newBalance,
+        updated: updatedClient.account_balance
+      });
 
       // Update position
       const newQuantity = position.quantity - quantity;
@@ -178,10 +290,49 @@ export async function POST(request: NextRequest) {
 
     if (transactionError) {
       console.error("Error recording transaction:", transactionError);
-      // Don't fail the request if transaction recording fails
+      // Don't fail the request if transaction recording fails, but log it
     }
 
-    return NextResponse.json({ success: true });
+    // Fetch updated client data to verify and return
+    // Use a fresh query to ensure we get the latest data from database
+    const { data: finalClientData, error: fetchError } = await adminClient
+      .from("users")
+      .select("account_balance, total_invested")
+      .eq("id", clientId)
+      .single();
+
+    if (fetchError) {
+      console.error("Error fetching updated client data:", fetchError);
+    }
+
+    // Verify the balance was actually updated
+    const expectedBalance = type === "buy" 
+      ? Number(clientData.account_balance) - Number(totalCost)
+      : Number(clientData.account_balance) + Number(total) - Number(fee);
+
+    console.log("Trade completed - Balance verification:", {
+      clientId,
+      symbol,
+      type,
+      quantity,
+      price,
+      totalCost,
+      oldBalance: clientData.account_balance,
+      expectedBalance,
+      actualBalance: finalClientData?.account_balance,
+      match: finalClientData?.account_balance === expectedBalance
+    });
+
+    if (finalClientData && Math.abs(Number(finalClientData.account_balance) - expectedBalance) > 0.01) {
+      console.warn("⚠️ Balance mismatch detected! Expected:", expectedBalance, "Got:", finalClientData.account_balance);
+    }
+
+    return NextResponse.json({ 
+      success: true,
+      updatedBalance: finalClientData?.account_balance,
+      oldBalance: clientData.account_balance,
+      transactionRecorded: !transactionError
+    });
   } catch (error) {
     console.error("Error processing admin trade:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

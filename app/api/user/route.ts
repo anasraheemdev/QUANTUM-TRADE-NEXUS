@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, tryCreateAdminClient } from "@/lib/supabase";
 
-// Force dynamic rendering - this route uses request headers
+// Force dynamic rendering - no caching
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
 export async function GET(request: NextRequest) {
   try {
@@ -121,10 +123,56 @@ export async function GET(request: NextRequest) {
       }
       
       console.log("Unique ID generated successfully:", uniqueId);
-      return NextResponse.json(updatedUser);
+      
+      // Parse balance correctly
+      const parsedBalance = updatedUser.account_balance 
+        ? (typeof updatedUser.account_balance === 'string' 
+            ? parseFloat(updatedUser.account_balance) 
+            : Number(updatedUser.account_balance))
+        : 1500;
+      
+      return NextResponse.json({
+        ...updatedUser,
+        account_balance: parsedBalance,
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      });
     }
 
-    return NextResponse.json(userData);
+    // Parse balance correctly before returning
+    const parsedBalance = userData.account_balance 
+      ? (typeof userData.account_balance === 'string' 
+          ? parseFloat(userData.account_balance) 
+          : Number(userData.account_balance))
+      : 1500;
+    
+    const parsedInvested = userData.total_invested
+      ? (typeof userData.total_invested === 'string'
+          ? parseFloat(userData.total_invested)
+          : Number(userData.total_invested))
+      : 0;
+    
+    console.log("User API - Returning user data:", {
+      balance: parsedBalance,
+      balanceType: typeof parsedBalance,
+      rawBalance: userData.account_balance
+    });
+
+    return NextResponse.json({
+      ...userData,
+      account_balance: parsedBalance,
+      total_invested: parsedInvested,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
   } catch (error) {
     console.error("Error fetching user:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, TrendingUp, TrendingDown, DollarSign, AlertCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AdminTradeModalProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ export default function AdminTradeModal({
   clientBalance,
   onTradeSuccess,
 }: AdminTradeModalProps) {
+  const { session } = useAuth();
   const [symbol, setSymbol] = useState("");
   const [type, setType] = useState<"buy" | "sell">("buy");
   const [quantity, setQuantity] = useState("");
@@ -78,10 +80,37 @@ export default function AdminTradeModal({
     setLoading(true);
 
     try {
+      if (!session) {
+        setError("You must be logged in to execute trades");
+        setLoading(false);
+        return;
+      }
+
+      if (!session.access_token) {
+        console.error("No access token in session:", session);
+        setError("Session expired. Please sign in again.");
+        setLoading(false);
+        return;
+      }
+
+      console.log("Executing trade:", { clientId, symbol, type, quantity: qty });
+      console.log("Session token exists:", !!session.access_token);
+      console.log("Session expires at:", session.expires_at ? new Date(session.expires_at * 1000).toISOString() : "N/A");
+      console.log("Current time:", new Date().toISOString());
+      
+      // Check if token is expired
+      if (session.expires_at && session.expires_at * 1000 < Date.now()) {
+        console.error("Token expired!");
+        setError("Session expired. Please refresh the page and try again.");
+        setLoading(false);
+        return;
+      }
+
       const response = await fetch("/api/admin/trade", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           clientId,
@@ -91,15 +120,42 @@ export default function AdminTradeModal({
         }),
       });
 
-      const data = await response.json();
+      console.log("Trade API response status:", response.status, response.statusText);
 
-      if (!response.ok) {
-        throw new Error(data.error || "Trade failed");
+      let data;
+      try {
+        data = await response.json();
+        console.log("Trade API response data:", data);
+      } catch (jsonError) {
+        console.error("Failed to parse JSON response:", jsonError);
+        const text = await response.text();
+        console.error("Response text:", text);
+        throw new Error(`Server error: ${response.status} ${response.statusText}`);
       }
 
+      if (!response.ok) {
+        console.error("Trade failed:", { 
+          status: response.status, 
+          statusText: response.statusText,
+          data 
+        });
+        const errorMsg = data?.error || data?.details || `Trade failed: ${response.status} ${response.statusText}`;
+        const fullError = data?.details ? `${data.error}: ${data.details}` : errorMsg;
+        console.error("Full error message:", fullError);
+        throw new Error(fullError);
+      }
+
+      console.log("Trade successful! Response:", data);
+      console.log("Updated balance from API:", data.updatedBalance);
+
       setSuccess(true);
+      
+      // Call onTradeSuccess immediately to refresh data
+      // This will fetch the latest data from the database
+      onTradeSuccess();
+      
+      // Close modal after a short delay
       setTimeout(() => {
-        onTradeSuccess();
         onClose();
         setSymbol("");
         setQuantity("");
@@ -107,7 +163,14 @@ export default function AdminTradeModal({
         setSuccess(false);
       }, 1500);
     } catch (err: any) {
-      setError(err.message || "Failed to execute trade");
+      console.error("Trade execution error:", err);
+      const errorMessage = err.message || "Failed to execute trade";
+      setError(errorMessage);
+      
+      // If it's a network error, show a more helpful message
+      if (err.name === "TypeError" && err.message.includes("fetch")) {
+        setError("Network error. Please check your connection and try again.");
+      }
     } finally {
       setLoading(false);
     }

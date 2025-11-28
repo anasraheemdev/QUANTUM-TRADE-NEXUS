@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, tryCreateAdminClient } from "@/lib/supabase";
 import { isAdmin } from "@/lib/admin";
 
-// Force dynamic rendering
+// Force dynamic rendering - no caching
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
 export async function GET(request: NextRequest) {
   try {
@@ -48,9 +50,10 @@ export async function GET(request: NextRequest) {
     }
     
     // Fetch all users (clients and admins) for admin dashboard
+    // Use admin client to get fresh data directly from database
     const { data: clients, error } = await adminClient
       .from("users")
-      .select("*")
+      .select("id, email, name, avatar_url, account_balance, total_invested, member_since, trading_level, role, unique_user_id, created_at, updated_at")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -58,8 +61,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch clients", details: error.message }, { status: 500 });
     }
 
-    console.log(`Fetched ${clients?.length || 0} users for admin dashboard`);
-    return NextResponse.json({ clients: clients || [] });
+    // Parse balances to ensure they're numbers
+    const parsedClients = (clients || []).map(client => ({
+      ...client,
+      account_balance: client.account_balance 
+        ? (typeof client.account_balance === 'string' ? parseFloat(client.account_balance) : Number(client.account_balance))
+        : 1500,
+      total_invested: client.total_invested
+        ? (typeof client.total_invested === 'string' ? parseFloat(client.total_invested) : Number(client.total_invested))
+        : 0,
+    }));
+
+    console.log(`Fetched ${parsedClients.length} users for admin dashboard`);
+    console.log("Sample client balance:", parsedClients[0]?.account_balance, "Type:", typeof parsedClients[0]?.account_balance);
+    
+    return NextResponse.json({ 
+      clients: parsedClients 
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
   } catch (error) {
     console.error("Error in admin clients route:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

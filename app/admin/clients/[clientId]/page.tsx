@@ -57,6 +57,7 @@ export default function AdminClientDetailPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ClientData | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0); // Force re-render key
   const [error, setError] = useState<string | null>(null);
   const [showTradeModal, setShowTradeModal] = useState(false);
 
@@ -100,12 +101,45 @@ export default function AdminClientDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, authLoading, router, clientId]);
 
-  const fetchClientData = async () => {
+  // Log when data changes
+  useEffect(() => {
+    if (data?.client) {
+      console.log("🔵 Data state changed - Balance:", data.client.account_balance, "Type:", typeof data.client.account_balance);
+    }
+  }, [data]);
+
+  // Auto-refresh data every 5 seconds to keep balance and transactions updated
+  useEffect(() => {
+    if (!isAdmin || !session) return;
+    
+    const interval = setInterval(() => {
+      console.log("🔄 Auto-refreshing client data...");
+      fetchClientData(false); // Don't show loading on auto-refresh
+    }, 5000);
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, session, clientId]);
+
+  const fetchClientData = async (showLoading = false) => {
+    if (showLoading) {
+      setLoading(true);
+    }
+    
     try {
-      const response = await fetch(`/api/admin/clients/${clientId}`, {
+      // Add timestamp to prevent caching
+      const timestamp = Date.now();
+      const randomId = Math.random().toString(36).substring(7);
+      const response = await fetch(`/api/admin/clients/${clientId}?t=${timestamp}&r=${randomId}`, {
+        method: 'GET',
         headers: {
-          Authorization: `Bearer ${session?.access_token}`,
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
         },
+        cache: 'no-store', // Disable browser caching
+        next: { revalidate: 0 }, // Disable Next.js caching
       });
 
       if (!response.ok) {
@@ -114,14 +148,38 @@ export default function AdminClientDetailPage() {
       }
 
       const clientData = await response.json();
-      console.log("Client data received:", clientData);
+      console.log("Client data received from API:", {
+        timestamp: new Date().toISOString(),
+        balance: clientData.client?.account_balance,
+        balanceType: typeof clientData.client?.account_balance,
+        fullData: clientData
+      });
       
       // Ensure data structure is correct
       if (!clientData.client) {
         throw new Error("Invalid client data structure");
       }
       
-      setData(clientData);
+      // Log before setting state
+      console.log("Setting state with balance:", clientData.client.account_balance);
+      console.log("Current state balance before update:", data?.client?.account_balance);
+      
+      // Force state update - create a new object to ensure React detects the change
+      const newData = {
+        ...clientData,
+        client: {
+          ...clientData.client,
+          account_balance: Number(clientData.client.account_balance) || 0,
+        }
+      };
+      
+      setData(newData);
+      setRefreshKey(prev => prev + 1); // Force re-render
+      setLoading(false);
+      
+      // Log after setting state
+      console.log("State updated - new balance:", newData.client.account_balance, "Refresh key:", refreshKey + 1);
+      setError(null); // Clear any previous errors
     } catch (err: any) {
       console.error("Error fetching client data:", err);
       setError(err.message || "Failed to load client data");
@@ -204,13 +262,22 @@ export default function AdminClientDetailPage() {
                   </p>
                 )}
               </div>
-              <button
-                onClick={() => setShowTradeModal(true)}
-                className="px-6 py-3 bg-blue-gradient text-white rounded-lg hover:shadow-blue-glow transition-all flex items-center gap-2"
-              >
-                <TrendingUp className="h-5 w-5" />
-                Execute Trade
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => fetchClientData(true)}
+                  className="px-4 py-3 bg-dark-hover border border-dark-border text-blue-accent hover:text-blue-primary rounded-lg transition-all flex items-center gap-2"
+                  title="Refresh data"
+                >
+                  <RefreshCw className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={() => setShowTradeModal(true)}
+                  className="px-6 py-3 bg-blue-gradient text-white rounded-lg hover:shadow-blue-glow transition-all flex items-center gap-2"
+                >
+                  <TrendingUp className="h-5 w-5" />
+                  Execute Trade
+                </button>
+              </div>
             </div>
           </div>
 
@@ -221,8 +288,8 @@ export default function AdminClientDetailPage() {
                 <DollarSign className="h-6 w-6 text-green-400" />
                 <span className="text-blue-accent/70 text-sm">Account Balance</span>
               </div>
-              <p className="text-2xl font-bold text-white">
-                {formatCurrency(client.account_balance || 0)}
+              <p className="text-2xl font-bold text-white" key={`balance-${data.client.account_balance}-${refreshKey}`}>
+                {formatCurrency(Number(data.client.account_balance) || 0)}
               </p>
             </div>
             <div className="bg-dark-card border border-dark-border rounded-lg p-6">
@@ -325,8 +392,18 @@ export default function AdminClientDetailPage() {
 
           {/* Transaction History */}
           <div>
-            <h2 className="text-xl font-bold text-white mb-4">Transaction History</h2>
-            {transactions.length === 0 ? (
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-white">Transaction History</h2>
+              <button
+                onClick={() => fetchClientData(true)}
+                className="px-3 py-2 bg-dark-hover border border-dark-border text-blue-accent hover:text-blue-primary rounded-lg transition-all flex items-center gap-2 text-sm"
+                title="Refresh transactions"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh
+              </button>
+            </div>
+            {!transactions || transactions.length === 0 ? (
               <div className="bg-dark-card border border-dark-border rounded-lg p-8 text-center">
                 <p className="text-blue-accent/70">No transactions yet</p>
               </div>
@@ -357,7 +434,7 @@ export default function AdminClientDetailPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-dark-border">
-                      {transactions.map((transaction) => (
+                      {transactions && transactions.map((transaction) => (
                         <tr key={transaction.id} className="hover:bg-dark-hover transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap text-blue-accent/70 text-sm">
                             {new Date(transaction.created_at).toLocaleDateString()}
@@ -397,15 +474,21 @@ export default function AdminClientDetailPage() {
       </div>
 
       {/* Trade Modal */}
-      {showTradeModal && (
+      {showTradeModal && data && (
         <AdminTradeModal
+          key={`trade-modal-${data.client.account_balance}-${data.client.id}`}
           isOpen={showTradeModal}
           onClose={() => setShowTradeModal(false)}
-          clientId={client.id}
-          clientName={client.name || client.email}
-          clientBalance={client.account_balance || 0}
-          onTradeSuccess={() => {
-            fetchClientData();
+          clientId={data.client.id}
+          clientName={data.client.name || data.client.email}
+          clientBalance={data.client.account_balance || 0}
+          onTradeSuccess={async () => {
+            // Add a small delay to ensure database update is complete
+            await new Promise(resolve => setTimeout(resolve, 500));
+            // Force refresh with loading indicator
+            await fetchClientData(true);
+            // Close modal after refresh
+            setShowTradeModal(false);
           }}
         />
       )}
