@@ -9,15 +9,17 @@ import { formatDistanceToNow } from "date-fns";
 
 interface Notification {
   id: string;
-  type: "credit_received" | "credit_sent";
+  type: "credit_received" | "credit_sent" | "info" | "success" | "warning" | "error";
   title: string;
   message: string;
-  amount: number;
+  amount?: number;
   from_user?: { id: string; name: string; email: string; unique_user_id?: string };
   to_user?: { id: string; name: string; email: string; unique_user_id?: string };
-  isReceived: boolean;
+  isReceived?: boolean;
   created_at: string;
   read: boolean;
+  source?: "transfer" | "admin";
+  from_admin?: boolean;
 }
 
 interface NotificationDropdownProps {
@@ -30,6 +32,7 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [dismissingId, setDismissingId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Fetch notifications function
@@ -39,16 +42,25 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
     setLoading(true);
     try {
       const token = session.access_token;
-      const response = await fetch("/api/notifications?limit=10", {
+      const response = await fetch("/api/notifications?limit=20", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        cache: 'no-store',
       });
 
       if (response.ok) {
         const data = await response.json();
+        console.log("📬 Fetched notifications:", {
+          total: data.total,
+          unread: data.unreadCount,
+          notifications: data.notifications?.length || 0
+        });
         setNotifications(data.notifications || []);
         setUnreadCount(data.unreadCount || 0);
+      } else {
+        const errorData = await response.json();
+        console.error("❌ Error fetching notifications:", errorData);
       }
     } catch (error) {
       console.error("Error fetching notifications:", error);
@@ -75,10 +87,14 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
     };
   }, [isOpen, session, fetchNotifications, onClose]);
 
-  // Poll for new notifications every 30 seconds
+  // Fetch notifications on mount and poll for new notifications every 30 seconds
   useEffect(() => {
     if (!session) return;
 
+    // Fetch immediately on mount
+    fetchNotifications();
+
+    // Poll for new notifications every 30 seconds
     const interval = setInterval(() => {
       fetchNotifications();
     }, 30000); // Poll every 30 seconds
@@ -87,17 +103,76 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
   }, [session, fetchNotifications]);
 
   const getNotificationIcon = (notification: Notification) => {
-    if (notification.isReceived) {
+    if (notification.type === "credit_received" || (notification.isReceived && notification.amount)) {
       return <ArrowDownRight className="h-5 w-5 text-green-400" />;
     }
-    return <ArrowUpRight className="h-5 w-5 text-blue-primary" />;
+    if (notification.type === "credit_sent" || (notification.amount && !notification.isReceived)) {
+      return <ArrowUpRight className="h-5 w-5 text-blue-primary" />;
+    }
+    if (notification.type === "success") {
+      return <Check className="h-5 w-5 text-green-400" />;
+    }
+    if (notification.type === "warning") {
+      return <Bell className="h-5 w-5 text-yellow-400" />;
+    }
+    if (notification.type === "error") {
+      return <X className="h-5 w-5 text-red-400" />;
+    }
+    return <Bell className="h-5 w-5 text-blue-primary" />;
   };
 
   const getNotificationColor = (notification: Notification) => {
-    if (notification.isReceived) {
+    if (notification.type === "credit_received" || (notification.isReceived && notification.amount)) {
       return "bg-green-500/10 border-green-500/20";
     }
+    if (notification.type === "success") {
+      return "bg-green-500/10 border-green-500/20";
+    }
+    if (notification.type === "warning") {
+      return "bg-yellow-500/10 border-yellow-500/20";
+    }
+    if (notification.type === "error") {
+      return "bg-red-500/10 border-red-500/20";
+    }
     return "bg-blue-500/10 border-blue-500/20";
+  };
+
+  const handleDismissNotification = async (notificationId: string) => {
+    if (!session || dismissingId) return;
+
+    setDismissingId(notificationId);
+    
+    try {
+      const token = session.access_token;
+      const response = await fetch(`/api/notifications/${notificationId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("✅ Notification dismissed:", notificationId, result);
+        // Remove notification from local state
+        setNotifications(prev => prev.filter(n => n.id !== notificationId));
+        // Update unread count
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      } else {
+        const errorData = await response.json();
+        console.log("⚠️ API failed but dismissing from UI:", errorData);
+        // Even if API fails, remove from UI (for transfer notifications)
+        setNotifications(prev => prev.filter(n => n.id !== notificationId));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error("Error dismissing notification:", error);
+      // Remove from UI anyway
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } finally {
+      setDismissingId(null);
+    }
   };
 
   return (
@@ -153,17 +228,19 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
                   <Bell className="h-12 w-12 text-blue-accent/30 mx-auto mb-4" />
                   <p className="text-blue-accent/70">No notifications yet</p>
                   <p className="text-blue-accent/50 text-sm mt-2">
-                    You&apos;ll see credit transfers here
+                    You&apos;ll see notifications for trades, balance changes, and more here
                   </p>
                 </div>
               ) : (
-                <div className="divide-y divide-dark-border">
-                  {notifications.map((notification) => (
-                    <motion.div
+                <AnimatePresence>
+                  <div className="divide-y divide-dark-border">
+                    {notifications.map((notification) => (
+                      <motion.div
                       key={notification.id}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
-                      className={`p-4 hover:bg-dark-hover transition-colors cursor-pointer ${getNotificationColor(notification)}`}
+                      exit={{ opacity: 0, x: 10 }}
+                      className={`p-4 hover:bg-dark-hover transition-colors ${getNotificationColor(notification)} relative group`}
                     >
                       <div className="flex items-start gap-3">
                         <div className="flex-shrink-0 mt-0.5">
@@ -174,9 +251,22 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
                             <p className="text-sm font-semibold text-white">
                               {notification.title}
                             </p>
-                            {!notification.read && (
-                              <div className="h-2 w-2 rounded-full bg-blue-primary flex-shrink-0 mt-1"></div>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {!notification.read && (
+                                <div className="h-2 w-2 rounded-full bg-blue-primary flex-shrink-0 mt-1"></div>
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDismissNotification(notification.id);
+                                }}
+                                disabled={dismissingId === notification.id}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-accent/70 hover:text-red-400 p-1 rounded hover:bg-red-500/10 disabled:opacity-50"
+                                title="Dismiss notification"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
                           </div>
                           {notification.message && (
                             <p className="text-xs text-blue-accent/70 mb-2">
@@ -184,21 +274,32 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
                             </p>
                           )}
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <DollarSign className="h-3 w-3 text-green-400" />
-                              <span className="text-sm font-bold text-green-400">
-                                {formatCurrency(notification.amount)}
-                              </span>
-                            </div>
+                            {notification.amount ? (
+                              <div className="flex items-center gap-2">
+                                <DollarSign className="h-3 w-3 text-green-400" />
+                                <span className="text-sm font-bold text-green-400">
+                                  {formatCurrency(notification.amount)}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                {notification.from_admin && (
+                                  <span className="text-xs text-purple-400 font-medium">
+                                    From Admin
+                                  </span>
+                                )}
+                              </div>
+                            )}
                             <span className="text-xs text-blue-accent/50">
                               {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                             </span>
                           </div>
                         </div>
                       </div>
-                    </motion.div>
-                  ))}
-                </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </AnimatePresence>
               )}
             </div>
 

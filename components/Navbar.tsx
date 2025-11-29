@@ -33,21 +33,27 @@ export default function Navbar() {
           headers: {
             Authorization: `Bearer ${token}`,
           },
+          cache: 'no-store',
         });
 
         if (response.ok) {
           const data = await response.json();
+          console.log("Notification count fetched:", data.unreadCount);
           setUnreadCount(data.unreadCount || 0);
+        } else {
+          const errorData = await response.json();
+          console.error("Error fetching notification count:", errorData);
         }
       } catch (error) {
         console.error("Error fetching notification count:", error);
       }
     };
 
+    // Fetch immediately
     fetchNotificationCount();
 
-    // Poll for new notifications every 30 seconds
-    const interval = setInterval(fetchNotificationCount, 30000);
+    // Poll for new notifications every 10 seconds (more frequent for better UX)
+    const interval = setInterval(fetchNotificationCount, 10000);
 
     return () => clearInterval(interval);
   }, [session, user]);

@@ -29,6 +29,27 @@ export async function GET(request: NextRequest) {
     const unreadOnly = searchParams.get("unread") === "true";
     const limit = parseInt(searchParams.get("limit") || "20");
 
+    // Fetch notifications from notifications table
+    let notificationsQuery = clientToUse
+      .from("notifications")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    const { data: notificationsData, error: notificationsError } = await notificationsQuery;
+    
+    // Log if notifications table doesn't exist (non-critical)
+    if (notificationsError) {
+      if (notificationsError.code === 'PGRST116' || notificationsError.code === '42P01') {
+        console.log("⚠️ Notifications table does not exist yet. Run ADMIN_OPERATIONS_SETUP.sql");
+      } else {
+        console.error("❌ Error fetching notifications:", notificationsError);
+      }
+    } else {
+      console.log(`✅ Fetched ${notificationsData?.length || 0} notifications from database`);
+    }
+
     // Fetch recent credit transfers where user is involved
     // Try with foreign key first, fallback to manual join if needed
     let query = supabase
@@ -90,12 +111,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform transfers into notifications
-    const notifications = (transfers || []).map((transfer: any) => {
+    const transferNotifications = (transfers || []).map((transfer: any) => {
       const isReceived = transfer.to_user_id === user.id;
       const otherUser = isReceived ? transfer.from_user : transfer.to_user;
       
       return {
-        id: transfer.id,
+        id: `transfer-${transfer.id}`,
         type: isReceived ? "credit_received" : "credit_sent",
         title: isReceived 
           ? `Received ${transfer.amount} credits from ${otherUser?.name || "Unknown"}`
@@ -108,17 +129,37 @@ export async function GET(request: NextRequest) {
         to_user: transfer.to_user,
         isReceived,
         created_at: transfer.created_at,
-        read: false, // You can add a read status column later
+        read: false,
+        source: "transfer",
       };
     });
 
+    // Transform admin notifications - use the actual ID from database
+    const adminNotifications = (notificationsData || []).map((notif: any) => ({
+      id: notif.id, // Use actual database ID (not prefixed)
+      type: notif.type || "info",
+      title: notif.title,
+      message: notif.message,
+      created_at: notif.created_at,
+      read: notif.read || false,
+      from_admin: notif.from_admin || false,
+      source: "admin",
+    }));
+
+    // Combine and sort by date
+    const allNotifications = [...transferNotifications, ...adminNotifications]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, limit);
+
     // Count unread notifications
-    const unreadCount = notifications.filter((n: any) => !n.read).length;
+    const unreadCount = allNotifications.filter((n: any) => !n.read).length;
+
+    console.log(`📊 Notification summary: ${transferNotifications.length} transfers, ${adminNotifications.length} admin, ${allNotifications.length} total, ${unreadCount} unread`);
 
     return NextResponse.json({
-      notifications,
+      notifications: allNotifications,
       unreadCount,
-      total: notifications.length,
+      total: allNotifications.length,
     });
   } catch (error) {
     console.error("Error fetching notifications:", error);

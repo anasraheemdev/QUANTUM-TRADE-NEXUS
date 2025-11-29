@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, tryCreateAdminClient } from "@/lib/supabase";
 import { isAdmin } from "@/lib/admin";
+import { notifyTradeExecution } from "@/lib/notifications";
 import fs from "fs";
 import path from "path";
 
@@ -327,11 +328,35 @@ export async function POST(request: NextRequest) {
       console.warn("⚠️ Balance mismatch detected! Expected:", expectedBalance, "Got:", finalClientData.account_balance);
     }
 
+    // Create notification for the client
+    try {
+      console.log("🔔 Attempting to create trade notification for client:", clientId);
+      const notificationResult = await notifyTradeExecution(
+        clientId,
+        symbol,
+        type,
+        quantity,
+        price,
+        totalCost,
+        user.id
+      );
+      console.log("🔔 Trade notification creation result:", notificationResult);
+    } catch (notificationError) {
+      console.error("❌ Error creating trade notification (non-fatal):", notificationError);
+      // Don't fail the trade if notification fails
+    }
+
     return NextResponse.json({ 
       success: true,
       updatedBalance: finalClientData?.account_balance,
       oldBalance: clientData.account_balance,
       transactionRecorded: !transactionError
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
     });
   } catch (error) {
     console.error("Error processing admin trade:", error);

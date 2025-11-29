@@ -20,6 +20,7 @@ import {
 import Loading from "@/components/Loading";
 import Link from "next/link";
 import AdminTradeModal from "@/components/AdminTradeModal";
+import AdminOperationsModal from "@/components/AdminOperationsModal";
 
 interface ClientData {
   client: {
@@ -60,6 +61,7 @@ export default function AdminClientDetailPage() {
   const [refreshKey, setRefreshKey] = useState(0); // Force re-render key
   const [error, setError] = useState<string | null>(null);
   const [showTradeModal, setShowTradeModal] = useState(false);
+  const [showOperationsModal, setShowOperationsModal] = useState(false);
 
   const clientId = params.clientId as string;
 
@@ -271,6 +273,13 @@ export default function AdminClientDetailPage() {
                   <RefreshCw className="h-5 w-5" />
                 </button>
                 <button
+                  onClick={() => setShowOperationsModal(true)}
+                  className="px-6 py-3 bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/20 rounded-lg transition-all flex items-center gap-2"
+                >
+                  <Edit className="h-5 w-5" />
+                  Admin Operations
+                </button>
+                <button
                   onClick={() => setShowTradeModal(true)}
                   className="px-6 py-3 bg-blue-gradient text-white rounded-lg hover:shadow-blue-glow transition-all flex items-center gap-2"
                 >
@@ -473,25 +482,40 @@ export default function AdminClientDetailPage() {
         </motion.div>
       </div>
 
-      {/* Trade Modal */}
-      {showTradeModal && data && (
-        <AdminTradeModal
-          key={`trade-modal-${data.client.account_balance}-${data.client.id}`}
-          isOpen={showTradeModal}
-          onClose={() => setShowTradeModal(false)}
-          clientId={data.client.id}
-          clientName={data.client.name || data.client.email}
-          clientBalance={data.client.account_balance || 0}
-          onTradeSuccess={async () => {
-            // Add a small delay to ensure database update is complete
-            await new Promise(resolve => setTimeout(resolve, 500));
-            // Force refresh with loading indicator
-            await fetchClientData(true);
-            // Close modal after refresh
-            setShowTradeModal(false);
-          }}
-        />
-      )}
+          {/* Trade Modal */}
+          {showTradeModal && data && (
+            <AdminTradeModal
+              key={`trade-modal-${data.client.account_balance}-${data.client.id}`}
+              isOpen={showTradeModal}
+              onClose={() => setShowTradeModal(false)}
+              clientId={data.client.id}
+              clientName={data.client.name || data.client.email}
+              clientBalance={data.client.account_balance || 0}
+              onTradeSuccess={async () => {
+                // Add a small delay to ensure database update is complete
+                await new Promise(resolve => setTimeout(resolve, 500));
+                // Force refresh with loading indicator
+                await fetchClientData(true);
+                // Close modal after refresh
+                setShowTradeModal(false);
+              }}
+            />
+          )}
+
+          {/* Admin Operations Modal */}
+          {showOperationsModal && data && (
+            <AdminOperationsModal
+              isOpen={showOperationsModal}
+              onClose={() => setShowOperationsModal(false)}
+              clientId={data.client.id}
+              clientName={data.client.name || data.client.email}
+              clientEmail={data.client.email}
+              currentBalance={data.client.account_balance || 0}
+              onSuccess={async () => {
+                await fetchClientData(true);
+              }}
+            />
+          )}
     </div>
     </> 
   );

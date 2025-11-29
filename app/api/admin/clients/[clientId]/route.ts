@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, tryCreateAdminClient } from "@/lib/supabase";
 import { isAdmin } from "@/lib/admin";
+import { notifyProfileUpdate } from "@/lib/notifications";
 import fs from "fs";
 import path from "path";
 
@@ -185,6 +186,13 @@ export async function PUT(
     // Use admin client to update client data
     const adminClient = tryCreateAdminClient() || supabase;
     
+    // Get current client data to compare changes
+    const { data: currentClient } = await adminClient
+      .from("users")
+      .select("name, email, trading_level")
+      .eq("id", clientId)
+      .single();
+
     const { data: updatedClient, error: updateError } = await adminClient
       .from("users")
       .update(body)
@@ -197,7 +205,25 @@ export async function PUT(
       return NextResponse.json({ error: "Failed to update client" }, { status: 500 });
     }
 
-    return NextResponse.json({ client: updatedClient });
+    // Create notification for profile changes (excluding balance changes)
+    if (currentClient) {
+      const changes: string[] = [];
+      if (body.name && body.name !== currentClient.name) changes.push("name");
+      if (body.email && body.email !== currentClient.email) changes.push("email");
+      if (body.trading_level && body.trading_level !== currentClient.trading_level) changes.push("trading level");
+      
+      if (changes.length > 0) {
+        await notifyProfileUpdate(clientId, changes, user.id);
+      }
+    }
+
+    return NextResponse.json({ client: updatedClient }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
   } catch (error) {
     console.error("Error in admin client update route:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

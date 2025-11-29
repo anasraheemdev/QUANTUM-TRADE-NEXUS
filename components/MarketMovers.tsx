@@ -34,11 +34,11 @@ export default function MarketMovers({ stocks }: MarketMoversProps) {
                 <div className="flex items-center justify-between p-3 rounded-lg border border-dark-border bg-dark-hover hover:border-blue-primary hover:shadow-blue-glow transition-all cursor-pointer">
                   <div className="flex items-center gap-3 flex-1">
                     <div className={`p-2 rounded ${
-                      isPositive ? "bg-green-400/10" : "bg-red-400/10"
-                    }`}>
-                      {isPositive ? (
+                      isPositive ? "bg-green-400/10" : "bg-red-400/10"  
+                    }`}>                                                
+                      {isPositive ? (                                    
                         <TrendingUp className="h-4 w-4 text-green-400" />
-                      ) : (
+                      ) : (                                               
                         <TrendingDown className="h-4 w-4 text-red-400" />
                       )}
                     </div>

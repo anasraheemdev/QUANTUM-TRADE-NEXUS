@@ -10,7 +10,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, name: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, name: string, requestAdminAccess?: boolean) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
 
@@ -135,16 +135,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, name: string) => {
+  const signUp = async (email: string, password: string, name: string, requestAdminAccess: boolean = false) => {
     try {
-      console.log('Starting signup for:', email);
+      console.log('Starting signup for:', email, 'Admin request:', requestAdminAccess);
       
+      // Sign up without email confirmation (simple register)
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             name: name,
+            requestAdminAccess: requestAdminAccess,
           },
           emailRedirectTo: `${window.location.origin}/dashboard`,
         },
@@ -181,6 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               userId: data.user.id,
               email: data.user.email || email,
               name: name,
+              requestAdminAccess: requestAdminAccess,
             }),
           });
 

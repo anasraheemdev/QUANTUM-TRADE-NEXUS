@@ -41,6 +41,7 @@ const protectedMenuItems = [
 const adminMenuItems = [
   { icon: Shield, label: "Admin Portal", href: "/admin", requiresAuth: true, adminOnly: true },
   { icon: Users, label: "Client Management", href: "/admin/clients", requiresAuth: true, adminOnly: true },
+  { icon: Shield, label: "Admin Requests", href: "/admin/requests", requiresAuth: true, adminOnly: true },
 ];
 
 interface SidebarProps {

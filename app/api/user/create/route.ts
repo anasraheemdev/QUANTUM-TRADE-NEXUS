@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, email, name } = body;
+    const { userId, email, name, requestAdminAccess } = body;
 
     if (!userId || !email) {
       return NextResponse.json(
@@ -95,9 +95,35 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("✅ User profile created successfully:", newUser?.id);
+    
+    // If admin access was requested, create an admin request
+    if (requestAdminAccess) {
+      try {
+        const { error: requestError } = await supabase
+          .from("admin_requests")
+          .insert({
+            user_id: userId,
+            email: email,
+            name: name || email.split("@")[0] || "User",
+            status: 'pending',
+          });
+        
+        if (requestError) {
+          console.error("Error creating admin request:", requestError);
+          // Don't fail the signup if admin request creation fails
+        } else {
+          console.log("✅ Admin access request created for user:", userId);
+        }
+      } catch (err) {
+        console.error("Exception creating admin request:", err);
+        // Don't fail the signup if admin request creation fails
+      }
+    }
+    
     return NextResponse.json({ 
       message: "User profile created successfully",
-      user: newUser 
+      user: newUser,
+      adminRequestCreated: requestAdminAccess || false
     });
   } catch (error) {
     console.error("Error in user creation API:", error);

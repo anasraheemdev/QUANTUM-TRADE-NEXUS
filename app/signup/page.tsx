@@ -16,6 +16,7 @@ export default function SignUpPage() {
     email: "",
     password: "",
     confirmPassword: "",
+    requestAdminAccess: false,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +39,12 @@ export default function SignUpPage() {
       return;
     }
 
-    const { error } = await signUp(formData.email, formData.password, formData.name);
+    const { error } = await signUp(
+      formData.email, 
+      formData.password, 
+      formData.name,
+      formData.requestAdminAccess
+    );
     
     setIsLoading(false);
     if (error) {
@@ -46,6 +52,11 @@ export default function SignUpPage() {
       setError(error.message || "Failed to create account. Please try again.");
     } else {
       // Success - user will be redirected by AuthContext
+      if (formData.requestAdminAccess) {
+        setError(null);
+        // Show success message for admin request
+        alert("Account created successfully! Your admin access request has been submitted and is pending approval.");
+      }
       console.log('Signup successful');
     }
   };
@@ -198,6 +209,21 @@ export default function SignUpPage() {
                   )}
                 </button>
               </div>
+            </div>
+
+            {/* Admin Access Request */}
+            <div className="flex items-center gap-3 p-4 rounded-lg bg-dark-hover border border-dark-border">
+              <input
+                type="checkbox"
+                id="requestAdminAccess"
+                name="requestAdminAccess"
+                checked={formData.requestAdminAccess}
+                onChange={(e) => setFormData({ ...formData, requestAdminAccess: e.target.checked })}
+                className="h-5 w-5 rounded border-dark-border bg-dark-card text-blue-primary focus:ring-blue-primary focus:ring-offset-dark-bg"
+              />
+              <label htmlFor="requestAdminAccess" className="text-sm text-blue-accent cursor-pointer">
+                Request Admin Access (Requires approval from existing admins)
+              </label>
             </div>
 
             {/* Error Message */}

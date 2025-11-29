@@ -18,7 +18,6 @@ import {
   Send,
 } from "lucide-react";
 import Loading from "@/components/Loading";
-import TransferModal from "@/components/TransferModal";
 
 interface PublicUserProfile {
   id: string;
@@ -40,7 +39,6 @@ function UserProfileContent() {
   const [user, setUser] = useState<PublicUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showTransferModal, setShowTransferModal] = useState(false);
   const userId = params.userId as string;
 
   useEffect(() => {
@@ -199,15 +197,6 @@ function UserProfileContent() {
                     <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white">
                       {user.name}
                     </h2>
-                    {!isOwnProfile && (
-                      <button
-                        onClick={() => setShowTransferModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-gradient text-white hover:shadow-blue-glow transition-all text-sm"
-                      >
-                        <Send className="h-4 w-4" />
-                        Send Credits
-                      </button>
-                    )}
                   </div>
                   <div className="flex flex-col sm:flex-row flex-wrap items-center sm:items-start justify-center sm:justify-start gap-2 sm:gap-4 text-xs sm:text-sm text-blue-accent/70">
                     <div className="flex items-center gap-2">
@@ -306,19 +295,6 @@ function UserProfileContent() {
         </main>
       </div>
 
-      {/* Transfer Modal */}
-      {showTransferModal && user && (
-        <TransferModal
-          recipientId={user.id}
-          recipientUniqueId={user.unique_user_id}
-          recipientName={user.name}
-          onClose={() => setShowTransferModal(false)}
-          onSuccess={() => {
-            setShowTransferModal(false);
-            // Refresh user data if needed
-          }}
-        />
-      )}
     </div>
   );
 }

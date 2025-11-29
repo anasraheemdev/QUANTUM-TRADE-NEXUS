@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, tryCreateAdminClient } from "@/lib/supabase";
+import { isAdmin } from "@/lib/admin";
+import { notifyCreditTransfer } from "@/lib/notifications";
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -32,6 +34,14 @@ export async function POST(request: NextRequest) {
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Check if user is admin - only admins can transfer
+    const adminStatus = await isAdmin(user.id);
+    if (!adminStatus) {
+      return NextResponse.json({ 
+        error: "Forbidden: Only administrators can transfer credits" 
+      }, { status: 403 });
     }
 
     const body = await request.json();
@@ -236,6 +246,15 @@ export async function POST(request: NextRequest) {
         // Transfer already happened, just log the error
       }
 
+      // Create notifications for both users
+      await notifyCreditTransfer(
+        user.id,
+        receiver.id,
+        amount,
+        note || undefined,
+        user.id // Admin ID (since only admins can transfer)
+      );
+
       return NextResponse.json({
         success: true,
         message: `Successfully transferred $${amount} to ${receiver.name}`,
@@ -263,6 +282,15 @@ export async function POST(request: NextRequest) {
       .select("*")
       .eq("id", transferResult.transfer_id)
       .single();
+
+    // Create notifications for both users
+    await notifyCreditTransfer(
+      user.id,
+      receiver.id,
+      amount,
+      note || undefined,
+      user.id // Admin ID (since only admins can transfer)
+    );
 
     return NextResponse.json({
       success: true,
